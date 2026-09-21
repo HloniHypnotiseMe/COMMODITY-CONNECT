@@ -6,9 +6,13 @@
     <meta name="theme-color" content="#07111f" />
     <meta name="description" content="Commodity Connect — protected commodity deal-chain infrastructure." />
     <title>Commodity Connect</title>
+    <script>
+      const base = '/COMMODITY-CONNECT/';
+      const target = base + location.pathname.replace(/^\/COMMODITY-CONNECT\/?/, '') + location.search + location.hash;
+      location.replace(target);
+    </script>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <p>Loading Commodity Connect…</p>
   </body>
 </html>
