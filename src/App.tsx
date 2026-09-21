@@ -195,8 +195,8 @@ export default function App() {
         pb.collection('kyc_profiles').getFullList({ filter: 'status = "pending"', sort: '-created', fields: 'id,legal_name,role' }),
         pb.collection('documents').getFullList({ filter: 'verified = false', sort: '-created', fields: 'id,type,deal' }),
       ]);
-      setAdminKyc(kyc as Array<{ id: string; legal_name: string; role: string }>);
-      setAdminDocs(docs as Array<{ id: string; type: string; deal: string }>);
+      setAdminKyc(kyc.map(doc => ({ id: doc.id, legal_name: String(doc.get('legal_name')), role: String(doc.get('role')) })));
+      setAdminDocs(docs.map(doc => ({ id: doc.id, type: String(doc.get('type')), deal: String(doc.get('deal')) })));
       notice(`Admin queue loaded: ${kyc.length} pending KYC profile(s), ${docs.length} unverified document(s).`);
     } catch (error) { notice(error instanceof Error ? error.message : 'Could not load admin queue.'); }
     finally { setBusy(false); }
