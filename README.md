@@ -1,6 +1,6 @@
 # Commodity Connect
 
-C6 Group / Vat Production — protected commodity deal-chain infrastructure.
+C6 Group / REMOTEPAY FINTECH SERVICES — protected commodity deal-chain infrastructure.
 
 ## Product boundary
 
