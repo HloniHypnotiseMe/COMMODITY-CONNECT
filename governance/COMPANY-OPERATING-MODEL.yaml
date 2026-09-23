@@ -1,0 +1,20 @@
+# Product-specific company operating model
+# Generated from C6-Os/agent-arsenal/governance/C6-COMPANY-OPERATING-MODEL.yaml
+product:
+  id: commodity_connect
+  name: "Commodity Connect"
+  repo: COMMODITY-CONNECT
+  ceo:
+    role: "Commodity Connect CEO"
+    agent_id: "commodity-connect.ceo"
+  departments:
+    strategy: {head: "Chief Strategy Officer", agents: ["commodity-market-intelligence", "country-market-analyst"]}
+    origination: {head: "Chief Origination Officer", agents: ["buyer-originator", "seller-originator", "mandate-manager"]}
+    trade_operations: {head: "Chief Trade Operations Officer", agents: ["deal-coordinator", "document-controller", "sgs-evidence-coordinator"]}
+    commission: {head: "Head of Commission Operations", agents: ["commission-chain-manager", "ncn-da-controller", "imfpa-controller"]}
+    finance: {head: "Chief Financial Officer", agents: ["payment-controller", "commission-reconciliation"]}
+    technology: {head: "Chief Technology Officer", agents: ["platform-engineer", "migration-engineer", "qa-engineer"]}
+    risk_compliance: {head: "Chief Risk & Compliance Officer", agents: ["trade-risk", "kyc-coordinator", "evidence-auditor"]}
+    customer_success: {head: "Chief Customer Officer", agents: ["buyer-success", "seller-success", "facilitator-support"]}
+  role_boundary: "Application controls do not by themselves establish legal enforceability of NCNDA/IMFPA or prove a trade outcome."
+  platform_dependencies: [c6-saas-core, RemotePay-, C6-Os]
