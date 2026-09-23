@@ -4,7 +4,14 @@ C6 Group / REMOTEPAY FINTECH SERVICES — protected commodity deal-chain infrast
 
 ## Product boundary
 
-Commodity Connect uses PocketBase as its intended application data layer and RemotePay as the canonical shared payment infrastructure. 
+Commodity Connect is being re-homed onto the C6-owned self-hosted platform. The current repository still contains PocketBase-era application data paths; these are migration work, not a production claim. RemotePay remains the canonical shared payment infrastructure. 
+
+## Current architecture status
+
+- **Payment truth:** RemotePay.
+- **Platform target:** C6 self-hosted platform / C6-owned Supabase component.
+- **Legacy runtime:** PocketBase-era paths remain in this repository and are tracked as a migration gap; they must not be treated as the target production architecture.
+- **Claim gate:** UI/code presence is not proof of a live trade, payment, escrow, payout, registration, or external-provider outcome.
 
 ## Current foundation
 
