@@ -4,16 +4,33 @@ C6 Group / REMOTEPAY FINTECH SERVICES — protected commodity deal-chain infrast
 
 ## Product boundary
 
-Commodity Connect is being re-homed onto the C6-owned self-hosted platform. The shared C6 SaaS Core is the target persistence/control plane, backed by PostgreSQL. The current repository still contains PocketBase-era application data paths as migration/dev compatibility; these are not the final production runtime.
+Commodity Connect is being re-homed onto the C6-owned self-hosted platform. C6 SaaS Core is the target persistence/control plane, backed by PostgreSQL.
+
+The production payment path is:
+
+```
+Commodity Connect browser
+  -> C6 SaaS Core
+  -> C6 RemotePay adapter
+  -> RemotePay/provider
+  -> provider evidence
+  -> C6 PostgreSQL
+  -> downstream events/audit
+```
+
+The browser must never call RemotePay directly or receive RemotePay merchant/provider secrets.
+
+PocketBase-era application data paths remain only as migration/dev compatibility and are not the final production runtime.
 
 ## Current architecture status
 
-- Payment truth: RemotePay.
+- Payment truth: RemotePay/provider evidence, reached through the C6 platform boundary.
 - Platform target: C6 SaaS Core / shared C6 PostgreSQL.
 - Legacy runtime: PocketBase-era paths remain only for migration/dev compatibility.
 - Claim gate: UI/code presence is not proof of a live trade, payment, escrow, payout, registration, or external-provider outcome.
+- The C6 payment-link route contract is defined in `src/platform-client.ts`; the corresponding C6 SaaS Core runtime endpoint must be implemented and exercised before this integration can be called WORKS/VERIFIED/LIVE.
 
-## Current foundation
+## Foundation
 
 - React + Vite + TypeScript
 - Commodity catalogue
@@ -25,6 +42,7 @@ Commodity Connect is being re-homed onto the C6-owned self-hosted platform. The 
 - Seven-stream revenue quote model
 - C6 platform persistence contract
 - Evidence-first payment/escrow messaging
+- C6 platform payment boundary client
 
 ## Production principles
 
@@ -34,3 +52,4 @@ Commodity Connect is being re-homed onto the C6-owned self-hosted platform. The 
 - Sensitive KYC and payout data must never be exposed in logs.
 - Crypto settlement is disabled until a real supported rail is verified.
 - C6 control-plane credentials never enter browser bundles.
+- No product may create a second direct RemotePay integration when the shared C6 adapter is the authoritative payment boundary.
