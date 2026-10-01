@@ -10,7 +10,8 @@
     "check": "tsc -b --pretty false",
     "test:domain": "node tests/domain.test.mjs",
     "test:fire": "node tests/fire.test.mjs",
-    "test": "npm run test:domain && npm run test:fire"
+    "test": "npm run test:domain && npm run test:fire && npm run test:agent-company",
+    "test:agent-company": "node tests/agent-company.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
