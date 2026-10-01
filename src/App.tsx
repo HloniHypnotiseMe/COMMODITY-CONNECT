@@ -6,6 +6,7 @@ import { canAdvanceDeal, canUploadDocument, commissionSnapshot, DOCUMENT_SEQUENC
 import { buildFireIntelligence, fireHeadline } from './fire';
 import { agentCompanyHeadline, routeFindings } from './agent-company';
 import { isConfigured } from './config';
+import { buildCommandCentre } from './command-centre';
 import { createRemotePayPaymentLink, getRemotePayPaymentLink, pb } from './services';
 import type { CommissionParticipant, DealStatus, Role } from './types';
 
@@ -60,6 +61,7 @@ export default function App() {
   const paymentConfirmed = paymentStatus === 'paid';
   const deliveryEvidence = documents.includes('BL');
   const canAdvance = canAdvanceDeal(status, { paymentConfirmed, deliveryEvidence, chainLocked: locked });
+  const commandCentre = buildCommandCentre({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, pocketBaseConfigured: isConfigured.pocketBase });
 
   const notice = (text: string) => setMessage(text);
 
@@ -251,6 +253,14 @@ export default function App() {
         </div>
         <small className="config-line">FIRE is deterministic in Wave 2: it reads supplied application/provider state and does not invent payment, legal, verification or custody facts.</small>
         {(() => { const handoffs = routeFindings(buildFireIntelligence({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, pocketBaseConfigured: isConfigured.pocketBase })); return <div className="agent-company-box"><div className="panel-head"><div><span className="kicker">AGENT COMPANY</span><strong>{agentCompanyHeadline(handoffs)}</strong></div><span className="pill">PERMISSIONED</span></div><div className="handoff-list">{handoffs.slice(0,6).map(h => <div className="handoff-row" key={h.id}><span>{h.to}</span><strong>{h.status.replace('_',' ')}</strong><small>{h.action}{h.requiredApproval ? ` · approval: ${h.requiredApproval}` : ''}</small></div>)}</div></div> })()}
+      </section>
+
+      <section className="panel command-centre" id="command-centre">
+        <div className="panel-head"><div><span className="kicker">COMMAND CENTRE</span><h2>What needs to happen next</h2></div><span className="pill">{commandCentre.headline}</span></div>
+        <div className="command-metrics">{commandCentre.metrics.map(metric => <article className={`command-metric ${metric.state}`} key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.detail}</small></article>)}</div>
+        <div className="command-actions"><strong>Action queue</strong>{commandCentre.actions.length === 0 ? <span className="muted">No command items generated from the supplied state.</span> : commandCentre.actions.map(item => <div className="command-row" key={item.id}><span className={`command-priority ${item.priority}`}>{item.priority}</span><div><strong>{item.department}: {item.action}</strong><small>{item.reason}</small></div></div>)}</div>
+        <div className="command-lifecycle"><strong>Lifecycle</strong><div className="lifecycle-track">{commandCentre.lifecycle.map((step,i) => <div className={`lifecycle-step ${step.state}`} key={step.label}><span>{String(i+1).padStart(2,"0")}</span><small>{step.label}</small></div>)}</div></div>
+        <small className="config-line">Command Centre is a decision-support view over supplied application/provider evidence. It cannot create payment, custody, verification, release or legal outcomes.</small>
       </section>
 
       <section className="workspace" id="deal">
