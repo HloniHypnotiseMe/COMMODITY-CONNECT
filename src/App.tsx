@@ -3,6 +3,7 @@ import { ArrowRight, CheckCircle2, CircleDollarSign, FileCheck2, FileUp, KeyRoun
 import { commodities, demoDeal } from './data';
 import { commissionAmount, dealValue, money } from './lib';
 import { canAdvanceDeal, commissionSnapshot } from './domain';
+import { buildFireIntelligence, fireHeadline } from './fire';
 import { isConfigured } from './config';
 import { createRemotePayPaymentLink, getRemotePayPaymentLink, pb } from './services';
 import type { CommissionParticipant, DealStatus, Role } from './types';
@@ -45,6 +46,7 @@ export default function App() {
   const [role, setRole] = useState<Role>('buyer');
   const [adminKyc, setAdminKyc] = useState<Array<{ id: string; legal_name: string; role: string }>>([]);
   const [adminDocs, setAdminDocs] = useState<Array<{ id: string; type: string; deal: string }>>([]);
+  const [kycVerified, setKycVerified] = useState(false);
 
   const total = useMemo(() => dealValue(volume, unitPrice), [volume, unitPrice]);
   const chain = useMemo(() => commissionSnapshot(total, defaultParticipants), [total]);
@@ -63,11 +65,14 @@ export default function App() {
     try {
       if (authMode === 'signin') {
         await pb.collection('_pb_users_auth_').authWithPassword(email, password);
+        const kyc = await pb.collection('kyc_profiles').getList(1, 1, { filter: `owner = "${pb.authStore.record?.id}" && status = "verified"` });
+        setKycVerified(kyc.totalItems > 0);
         notice(`Signed in as ${pb.authStore.record?.email || email}.`);
       } else {
         await pb.collection('_pb_users_auth_').create({ email, password, passwordConfirm: password, name });
         await pb.collection('_pb_users_auth_').authWithPassword(email, password);
         await pb.collection('kyc_profiles').create({ owner: pb.authStore.record?.id, legal_name: name, role, status: 'pending' });
+        setKycVerified(false);
         notice('Account created. KYC is pending verification.');
       }
     } catch (error) { notice(error instanceof Error ? error.message : 'Authentication failed.'); }
@@ -224,6 +229,21 @@ export default function App() {
       </section>
 
       {message && <div className="notice">{message}</div>}
+
+      <section className="panel fire-panel" id="fire">
+        <div className="panel-head"><div><span className="kicker">FIRE CORE</span><h2>Operational intelligence</h2></div><span className="pill">LIVE STATE</span></div>
+        <p className="muted">{fireHeadline(buildFireIntelligence({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, pocketBaseConfigured: isConfigured.pocketBase }))}</p>
+        <div className="fire-grid">
+          {buildFireIntelligence({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, pocketBaseConfigured: isConfigured.pocketBase }).map(finding => <article className="fire-card" key={finding.id}>
+            <div className="fire-card-head"><span className={`fire-severity ${finding.severity}`}>{finding.severity}</span><span className="fire-dept">{finding.department}</span></div>
+            <strong>{finding.title}</strong>
+            <span>{finding.reason}</span>
+            <small><b>Next action:</b> {finding.nextAction}</small>
+            <small><b>Evidence:</b> {finding.evidence.join(' · ')}</small>
+          </article>)}
+        </div>
+        <small className="config-line">FIRE is deterministic in Wave 2: it reads supplied application/provider state and does not invent payment, legal, verification or custody facts.</small>
+      </section>
 
       <section className="workspace" id="deal">
         <div className="panel deal-builder">

@@ -1,0 +1,26 @@
+import type { DealStatus } from './types';
+
+export type FireDepartment = 'CEO' | 'Trade Operations' | 'Risk & Compliance' | 'Verification' | 'Finance' | 'Payments' | 'Technology' | 'Commercial' | 'Data & Intelligence';
+export type FireSeverity = 'critical' | 'high' | 'medium' | 'info';
+
+export interface FireSnapshot { dealId: string; status: DealStatus; kycVerified: boolean; documents: string[]; locked: boolean; paymentStatus: string; deliveryEvidence: boolean; remotePayConfigured: boolean; pocketBaseConfigured: boolean; }
+export interface FireFinding { id: string; severity: FireSeverity; department: FireDepartment; title: string; reason: string; nextAction: string; evidence: string[]; }
+const severityRank: Record<FireSeverity, number> = { critical: 4, high: 3, medium: 2, info: 1 };
+const has = (docs: string[], type: string) => docs.includes(type);
+
+export function buildFireIntelligence(snapshot: FireSnapshot): FireFinding[] {
+  const findings: FireFinding[] = [];
+  if (!snapshot.dealId) findings.push({ id:'deal-not-saved', severity:'high', department:'Trade Operations', title:'Deal is not persisted', reason:'There is no deal identifier, so production evidence cannot be attached to a deal record.', nextAction:'Save the deal before requesting payment or uploading evidence.', evidence:['dealId is empty'] });
+  else if (!snapshot.kycVerified) findings.push({ id:'kyc-pending', severity:'high', department:'Risk & Compliance', title:'KYC verification is unresolved', reason:'The current session does not establish verified KYC for the deal participant.', nextAction:'Route the participant to authorized KYC verification before treating the party as verified.', evidence:['kycVerified=false'] });
+  const requiredBeforeLock = ['LOI','BCL','FCO','SCO','POP','SGS','BL','NCNDA','IMFPA'];
+  const missingDocs = requiredBeforeLock.filter(type => !has(snapshot.documents, type));
+  if (missingDocs.length) findings.push({ id:'evidence-gap', severity:'high', department:'Verification', title:'Evidence chain is incomplete', reason:'Required deal documents are missing from the current evidence view.', nextAction:'Obtain and upload the missing evidence: ' + missingDocs.join(', ') + '.', evidence:['missing=' + missingDocs.join(',')] });
+  if (!snapshot.locked) findings.push({ id:'commission-unlocked', severity:snapshot.status === 'open' ? 'high' : 'critical', department:'Finance', title:'Commission chain is not locked', reason:'Commission allocation has not reached the application lock state.', nextAction:'Complete the authorized NCNDA/IMFPA verification path, then lock the commission snapshot.', evidence:['locked=false','NCNDA=' + has(snapshot.documents,'NCNDA'),'IMFPA=' + has(snapshot.documents,'IMFPA')] });
+  const paid = snapshot.paymentStatus === 'paid' || snapshot.paymentStatus === 'confirmed';
+  if (snapshot.dealId && !paid) findings.push({ id:'payment-unconfirmed', severity:'critical', department:'Payments', title:'Payment is not confirmed', reason:'RemotePay/provider evidence does not currently report a paid or confirmed state.', nextAction:snapshot.remotePayConfigured ? 'Request or refresh the RemotePay payment status and reconcile provider evidence.' : 'Configure the production RemotePay boundary before requesting a payment link.', evidence:['paymentStatus=' + snapshot.paymentStatus,'remotePayConfigured=' + snapshot.remotePayConfigured] });
+  if (snapshot.status === 'escrow_secured' && !snapshot.deliveryEvidence) findings.push({ id:'delivery-missing', severity:'high', department:'Trade Operations', title:'Delivery evidence is missing', reason:'The deal cannot satisfy the close/release evidence gate without delivery evidence.', nextAction:'Obtain and verify the required BL/delivery evidence through the authorized workflow.', evidence:['status=escrow_secured','deliveryEvidence=false'] });
+  if (!snapshot.pocketBaseConfigured) findings.push({ id:'legacy-runtime', severity:'medium', department:'Technology', title:'Legacy persistence runtime is not configured', reason:'The current V2 client still depends on PocketBase while C6 platform migration is planned.', nextAction:'Complete the C6 platform migration in Wave 6; do not treat PocketBase as the final production target.', evidence:['pocketBaseConfigured=false'] });
+  if (snapshot.status === 'closed' && paid && snapshot.deliveryEvidence && snapshot.locked) findings.push({ id:'lifecycle-ready', severity:'info', department:'CEO', title:'Current lifecycle gates are satisfied', reason:'The supplied state contains payment confirmation, locked commission chain and delivery evidence.', nextAction:'Maintain the audit trail and reconcile any provider release evidence before representing funds as released.', evidence:['status=closed','payment confirmed','chain locked','delivery evidence present'] });
+  return findings.sort((a,b) => severityRank[b.severity] - severityRank[a.severity]);
+}
+export function fireHeadline(findings: FireFinding[]): string { return findings.length ? findings[0].severity.toUpperCase() + ': ' + findings[0].title : 'No unresolved FIRE findings in the supplied state.'; }
