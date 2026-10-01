@@ -10,10 +10,11 @@
     "check": "tsc -b --pretty false",
     "test:domain": "node --experimental-strip-types tests/domain.test.mjs",
     "test:fire": "node tests/fire.test.mjs",
-    "test": "npm run test:domain && npm run test:fire && npm run test:agent-company && npm run test:revenue && npm run test:platform",
+    "test": "npm run test:domain && npm run test:fire && npm run test:agent-company && npm run test:revenue && npm run test:platform && npm run test:platform-boundary",
     "test:agent-company": "node tests/agent-company.test.mjs",
     "test:revenue": "node --experimental-strip-types tests/revenue.test.mjs",
-    "test:platform": "node --experimental-strip-types tests/platform.test.mjs"
+    "test:platform": "node --experimental-strip-types tests/platform.test.mjs",
+    "test:platform-boundary": "node --experimental-strip-types tests/platform-boundary.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
