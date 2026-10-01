@@ -4,6 +4,7 @@ import { commodities, demoDeal } from './data';
 import { commissionAmount, dealValue, money } from './lib';
 import { canAdvanceDeal, commissionSnapshot } from './domain';
 import { buildFireIntelligence, fireHeadline } from './fire';
+import { agentCompanyHeadline, routeFindings } from './agent-company';
 import { isConfigured } from './config';
 import { createRemotePayPaymentLink, getRemotePayPaymentLink, pb } from './services';
 import type { CommissionParticipant, DealStatus, Role } from './types';
@@ -243,6 +244,7 @@ export default function App() {
           </article>)}
         </div>
         <small className="config-line">FIRE is deterministic in Wave 2: it reads supplied application/provider state and does not invent payment, legal, verification or custody facts.</small>
+        {(() => { const handoffs = routeFindings(buildFireIntelligence({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, pocketBaseConfigured: isConfigured.pocketBase })); return <div className="agent-company-box"><div className="panel-head"><div><span className="kicker">AGENT COMPANY</span><strong>{agentCompanyHeadline(handoffs)}</strong></div><span className="pill">PERMISSIONED</span></div><div className="handoff-list">{handoffs.slice(0,6).map(h => <div className="handoff-row" key={h.id}><span>{h.to}</span><strong>{h.status.replace('_',' ')}</strong><small>{h.action}{h.requiredApproval ? ` · approval: ${h.requiredApproval}` : ''}</small></div>)}</div></div> })()}
       </section>
 
       <section className="workspace" id="deal">
