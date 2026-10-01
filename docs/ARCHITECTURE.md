@@ -2,25 +2,19 @@
 
 ## Product boundary
 
-Commodity Connect is independent of DieselConnect. It does not reuse DieselConnect's Supabase schema or payment code.
+Commodity Connect is independent of DieselConnect. It does not reuse DieselConnect's product schema or payment code.
 
 ## Frontend
 
 React + Vite + TypeScript. The interface is evidence-first: actions that would imply financial or legal state are gated by persisted evidence rather than optimistic UI state.
 
-## Application data
+## C6 platform persistence
 
-PocketBase is the intended application data layer. Migrations create:
+The target application data layer is the shared C6 SaaS Core PostgreSQL runtime. Commodity Connect uses tenant-scoped product tables defined by the C6 SaaS Core Commodity Connect migration.
 
-- `kyc_profiles`
-- `deals`
-- `deal_participants`
-- `documents`
-- `wallets`
-- `escrows`
-- `audit_events`
+The shared core owns cross-product governance stores such as audit events and evidence records. Commodity Connect owns its product domain rules and presentation.
 
-PocketBase API rules enforce authentication, ownership and locked-chain restrictions. `pb_hooks/commodity.pb.js` adds server-side invariants that cannot safely live only in the browser.
+PocketBase files remain in this repository only as migration/dev compatibility while the server-side C6 product adapter is admitted. They are not the final production persistence target.
 
 ## Payment boundary
 
@@ -28,12 +22,16 @@ Commodity Connect does not hold payment credentials or pretend to be a bank. It 
 
 ## Deal state
 
-`open` is the initial application state. Transition to `escrow_secured` and `closed` is not a frontend-only action. It requires the appropriate provider/payment and delivery evidence and is advanced through the server-side reconciliation path.
+The canonical deal state is open -> escrow_secured -> closed. The C6 PostgreSQL migration carries server-side database guards for commission locking and lifecycle evidence. open -> escrow_secured requires confirmed RemotePay/provider evidence; escrow_secured -> closed requires released provider evidence and verified BL/delivery evidence.
 
 ## Commission protection
 
-Commission percentages are calculated from the deal value and persisted as participant records. After verified NCNDA and IMFPA evidence exists, the server-side lock invariant freezes the chain. The lock is an application control; legal enforceability depends on the signed agreements and applicable law.
+Commission percentages are calculated from deal value and persisted as participant records. After verified NCNDA and IMFPA evidence exists, the server-side lock invariant freezes the chain. The lock is an application control; legal enforceability depends on the signed agreements and applicable law.
 
 ## Escrow reconciliation boundary
 
-The `escrows` collection is an evidence record, not a money ledger. `pending`, `confirmed`, `release_requested`, `released`, and `disputed` are server-controlled reconciliation states. `confirmed` requires payment evidence; `release_requested` requires a locked deal, `escrow_secured` lifecycle state and verified BL evidence; `released` requires a provider release reference and release evidence. This prevents a frontend button from creating financial truth.
+The cc_escrows table is an evidence record, not a money ledger. Provider status, payment evidence, release reference and release evidence are stored for reconciliation. Database guards prevent a local record from manufacturing confirmed or released financial state.
+
+## Credential boundary
+
+The browser may know only public configuration such as the C6 SaaS Core base URL. C6 control-plane keys, database credentials, RemotePay secrets and webhook secrets remain server/runtime-only.
