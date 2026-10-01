@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { getC6PlatformConfig, platformReadiness, assertServerOnlyCredentialBoundary, C6_PLATFORM_PRODUCT_ID } from '../src/platform.ts';
+const missing = getC6PlatformConfig({});
+assert.equal(missing.productId, C6_PLATFORM_PRODUCT_ID);
+assert.equal(platformReadiness(missing), 'not_configured');
+const configured = getC6PlatformConfig({ VITE_C6_SAAS_CORE_URL: 'https://core.example.test/' });
+assert.equal(configured.baseUrl, 'https://core.example.test');
+assert.equal(platformReadiness(configured), 'configured');
+assert.doesNotThrow(() => assertServerOnlyCredentialBoundary({ 'content-type': 'application/json' }));
+assert.throws(() => assertServerOnlyCredentialBoundary({ 'X-C6-Control-Key': 'secret' }), /must not be supplied/);
+console.log('C6 platform contract tests passed.');
