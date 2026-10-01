@@ -10,8 +10,9 @@
     "check": "tsc -b --pretty false",
     "test:domain": "node --experimental-strip-types tests/domain.test.mjs",
     "test:fire": "node tests/fire.test.mjs",
-    "test": "npm run test:domain && npm run test:fire && npm run test:agent-company",
-    "test:agent-company": "node tests/agent-company.test.mjs"
+    "test": "npm run test:domain && npm run test:fire && npm run test:agent-company && npm run test:revenue",
+    "test:agent-company": "node tests/agent-company.test.mjs",
+    "test:revenue": "node --experimental-strip-types tests/revenue.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
