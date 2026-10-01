@@ -2,7 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { ArrowRight, CheckCircle2, CircleDollarSign, FileCheck2, FileUp, KeyRound, LockKeyhole, LogOut, Search, ShieldCheck, UserPlus, Wallet, RefreshCw } from 'lucide-react';
 import { commodities, demoDeal } from './data';
 import { commissionAmount, dealValue, money } from './lib';
-import { canAdvanceDeal, commissionSnapshot } from './domain';
+import { canAdvanceDeal, canUploadDocument, commissionSnapshot, DOCUMENT_SEQUENCE, getCommoditySpec, validateTradeTerms, type TradeUnit } from './domain';
 import { buildFireIntelligence, fireHeadline } from './fire';
 import { agentCompanyHeadline, routeFindings } from './agent-company';
 import { isConfigured } from './config';
@@ -28,6 +28,7 @@ export default function App() {
   const [volume, setVolume] = useState(demoDeal.volume);
   const [unitPrice, setUnitPrice] = useState(demoDeal.unitPrice);
   const [grade, setGrade] = useState(demoDeal.grade);
+  const [unit, setUnit] = useState<TradeUnit>(demoDeal.unit as TradeUnit);
   const [currency, setCurrency] = useState('USD');
   const [status, setStatus] = useState<DealStatus>('open');
   const [locked, setLocked] = useState(false);
@@ -54,6 +55,8 @@ export default function App() {
   const commissionTotal = commissionAmount(total, 3.5);
   const filtered = commodities.filter(c => c.toLowerCase().includes(search.toLowerCase()));
   const signedEvidence = documents.includes('NCNDA') && documents.includes('IMFPA');
+  const unitOptions = getCommoditySpec(commodity).allowedUnits;
+  const nextDocument = DOCUMENT_SEQUENCE.find(type => !documents.includes(type)) ?? null;
   const paymentConfirmed = paymentStatus === 'paid';
   const deliveryEvidence = documents.includes('BL');
   const canAdvance = canAdvanceDeal(status, { paymentConfirmed, deliveryEvidence, chainLocked: locked });
@@ -84,9 +87,11 @@ export default function App() {
     if (!pb.authStore.isValid) return notice('Sign in before saving a production deal.');
     setBusy(true); setMessage('');
     try {
+      const termErrors = validateTradeTerms({ commodity, grade, volume, unit, unitPrice });
+      if (termErrors.length) return notice(termErrors.join(' '));
       const reference = `CC-${Date.now().toString(36).toUpperCase()}`;
       const record = await pb.collection('deals').create({
-        reference, created_by: pb.authStore.record?.id, commodity, grade, volume, unit: 'MT',
+        reference, created_by: pb.authStore.record?.id, commodity, grade, volume, unit,
         unit_price: unitPrice, currency, total_value: total, status: 'open', total_commission_pct: 3.5,
         commission_locked: false,
       });
@@ -98,14 +103,15 @@ export default function App() {
 
   async function uploadDocument(file: File, type: string) {
     if (!dealId || !pb.authStore.isValid) return notice('Save the deal and sign in before uploading evidence.');
-    const sequence = ['LOI','FCO','BCL','POP','SGS','NCNDA','IMFPA','BL'];
-    const index = sequence.indexOf(type);
+    const index = DOCUMENT_SEQUENCE.indexOf(type as typeof DOCUMENT_SEQUENCE[number]);
     setBusy(true); setMessage('');
     try {
       const existing = await pb.collection('documents').getFullList({ filter: `deal = "\${dealId}"`, fields: 'type' });
       const existingTypes = new Set(existing.map((doc) => String(doc.type)));
-      const missing = sequence.slice(0, index).filter(step => !existingTypes.has(step));
-      if (missing.length) throw new Error(`Sequence gate: upload ${missing.join(', ')} before ${type}.`);
+      if (!canUploadDocument([...existingTypes], type)) {
+        const missing = DOCUMENT_SEQUENCE.slice(0, index).filter(step => !existingTypes.has(step));
+        throw new Error(`Sequence gate: upload ${missing.join(', ')} before ${type}.`);
+      }
       const form = new FormData();
       form.append('deal', dealId); form.append('type', type); form.append('sequence_index', String(index)); form.append('file', file); form.append('verified', 'false');
       await pb.collection('documents').create(form);
@@ -251,8 +257,8 @@ export default function App() {
         <div className="panel deal-builder">
           <div className="panel-head"><div><span className="kicker">DEAL BUILDER</span><h2>Commodity terms</h2></div><span className="pill">{status}</span></div>
           <label>Commodity<select value={commodity} onChange={e => setCommodity(e.target.value as typeof commodity)}>{commodities.map(c => <option key={c}>{c}</option>)}</select></label>
-          <div className="two"><label>Volume<input type="number" min="0" value={volume} onChange={e => setVolume(Number(e.target.value))}/></label><label>Unit<input value="MT" readOnly/></label></div>
-          <div className="two"><label>Grade<input value={grade} onChange={e => setGrade(e.target.value)}/></label><label>Currency<select value={currency} onChange={e => setCurrency(e.target.value)}><option>USD</option><option>ZAR</option><option>EUR</option></select></label></div>
+          <div className="two"><label>Volume<input type="number" min="0" value={volume} onChange={e => setVolume(Number(e.target.value))}/></label><label>Unit<select value={unit} onChange={e => setUnit(e.target.value as TradeUnit)}>{unitOptions.map(option => <option key={option}>{option}</option>)}</select></label></div>
+          <div className="two"><label>Grade/specification<input required value={grade} onChange={e => setGrade(e.target.value)}/></label><label>Currency<select value={currency} onChange={e => setCurrency(e.target.value)}><option>USD</option><option>ZAR</option><option>EUR</option></select></label></div>
           <label>Unit price<input type="number" min="0" value={unitPrice} onChange={e => setUnitPrice(Number(e.target.value))}/></label>
           <div className="value-box"><span>Indicative deal value</span><strong>{money(total, currency)}</strong><small>Calculation only — not a payment confirmation.</small></div>
           <div className="two"><button className="primary full" disabled={busy} onClick={saveDeal}>{dealId ? 'Deal saved' : 'Save deal'} <CheckCircle2 size={16}/></button><button className="ghost full" disabled={busy || !dealId || !isConfigured.remotePay} onClick={requestPayment}>Request payment <CircleDollarSign size={16}/></button></div>
@@ -272,11 +278,11 @@ export default function App() {
       <section className="panel evidence-panel">
         <div className="panel-head"><div><span className="kicker">EVIDENCE VAULT</span><h2>Deal documents</h2></div><FileCheck2 size={20}/></div>
         <p className="muted">Upload evidence against a saved deal. Uploading a document does not mark it verified; verification belongs to the authorized verification workflow.</p>
-        <div className="upload-grid">{['LOI','FCO','BCL','POP','SGS','BL','NCNDA','IMFPA'].map(type => <label className={`upload-card ${documents.includes(type) ? 'uploaded' : ''}`} key={type}><FileUp size={17}/><strong>{type}</strong><span>{documents.includes(type) ? 'Uploaded' : 'Choose file'}</span><input type="file" accept="application/pdf,image/jpeg,image/png" disabled={!dealId || busy} onChange={e => { const file = e.target.files?.[0]; if (file) void uploadDocument(file, type); }}/></label>)}</div>
+        <div className="upload-grid">{DOCUMENT_SEQUENCE.map(type => <label className={`upload-card ${documents.includes(type) ? 'uploaded' : ''}`} key={type}><FileUp size={17}/><strong>{type}</strong><span>{documents.includes(type) ? 'Uploaded' : 'Choose file'}</span><input type="file" accept="application/pdf,image/jpeg,image/png" disabled={!dealId || busy} onChange={e => { const file = e.target.files?.[0]; if (file) void uploadDocument(file, type); }}/></label>)}</div>
       </section>
 
       <section className="proof-grid">
-        <div className="proof-card"><FileCheck2/><strong>Verified document chain</strong><span>LOI → FCO → BCL → POP → SGS → BL → NCNDA → IMFPA, with evidence and timestamps.</span></div>
+        <div className="proof-card"><FileCheck2/><strong>Verified document chain</strong><span>LOI → BCL → FCO → SCO → POP → SGS → BL → NCNDA → IMFPA, with evidence and timestamps.</span></div>
         <div className="proof-card"><Wallet/><strong>RemotePay payment truth</strong><span>Payment status is read from the canonical RemotePay boundary/provider ledger. No local fake escrow flag.</span></div>
         <div className="proof-card"><CheckCircle2/><strong>Evidence-first release</strong><span>Release is gated by payment, locked chain and delivery evidence. A button cannot create financial proof.</span></div>
       </section>
