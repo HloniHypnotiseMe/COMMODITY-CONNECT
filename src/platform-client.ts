@@ -26,10 +26,16 @@ export function requireC6PlatformUrl(): string {
   return url;
 }
 
+function productHeaders(): Record<string, string> {
+  const key = String(import.meta.env.VITE_C6_PRODUCT_KEY || '').trim();
+  if (!key) throw new Error('C6 product capability key is not configured for this environment.');
+  return { 'X-C6-Product-Key': key };
+}
+
 async function platformRequest<T>(path: string, init: RequestInit): Promise<T> {
   const response = await fetch(`${requireC6PlatformUrl()}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+    headers: { 'Content-Type': 'application/json', ...productHeaders(), ...(init.headers || {}) },
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.detail || body.message || `C6 SaaS Core returned HTTP ${response.status}`);
