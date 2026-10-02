@@ -8,6 +8,7 @@ import { agentCompanyHeadline, routeFindings } from './agent-company';
 import { isConfigured } from './config';
 import { buildCommandCentre } from './command-centre';
 import { createRemotePayPaymentLink, getRemotePayPaymentLink } from './services';
+import { createDeal, addDealDocument, lockCommissionChain } from './runtime-client';
 import type { CommissionParticipant, DealStatus, Role } from './types';
 
 const roles: { value: Role; label: string }[] = [
@@ -72,15 +73,31 @@ export default function App() {
   }
 
   async function saveDeal() {
-    notice('C6 SaaS Core deal persistence is not deployed for this browser build yet. No local or PocketBase persistence is being used.');
+    if (!isConfigured.c6SaasCore) return notice('C6 SaaS Core is not configured for this environment.');
+    setBusy(true); setMessage('');
+    try {
+      const saved = await createDeal({ reference: dealId || `CC-${Date.now()}`, commodity, grade, volume, unit, unitPrice, currency, totalValue: total, totalCommissionPct: 3.5, participants: defaultParticipants.map(p => ({ userId: p.name, role: p.role, commissionPct: p.percentage, commissionAmount: p.amount, walletReady: p.walletReady })) });
+      setDealId(saved.id); setStatus(saved.status as DealStatus); setLocked(saved.commission_locked); notice(`Deal ${saved.reference} persisted in C6 SaaS Core.`);
+    } catch (error) { notice(error instanceof Error ? error.message : 'Could not persist deal.'); }
+    finally { setBusy(false); }
   }
 
-  async function uploadDocument(_file: File, _type: string) {
-    notice('C6 SaaS Core evidence persistence is not deployed for this browser build yet. No document was stored.');
+  async function uploadDocument(file: File, type: string) {
+    if (!dealId) return notice('Save the deal before uploading evidence.');
+    setBusy(true); setMessage('');
+    try {
+      await addDealDocument(dealId, { type, filename: file.name, sizeBytes: file.size, contentType: file.type || 'application/octet-stream' });
+      setDocuments(prev => prev.includes(type) ? prev : [...prev, type]); notice(`${type} metadata persisted in C6 SaaS Core. File bytes remain outside the API until object storage is connected.`);
+    } catch (error) { notice(error instanceof Error ? error.message : `Could not persist ${type}.`); }
+    finally { setBusy(false); }
   }
 
   async function lockChain() {
-    notice('C6 SaaS Core commission-chain persistence is not deployed for this browser build yet. No lock was recorded.');
+    if (!dealId) return notice('Save the deal before locking the commission chain.');
+    setBusy(true); setMessage('');
+    try { const saved = await lockCommissionChain(dealId); setLocked(saved.commission_locked); notice('Commission chain lock persisted and enforced by C6 SaaS Core.'); }
+    catch (error) { notice(error instanceof Error ? error.message : 'Commission-chain lock failed.'); }
+    finally { setBusy(false); }
   }
 
   async function requestPayment() {
