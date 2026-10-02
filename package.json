@@ -14,7 +14,7 @@
     "test:agent-company": "node tests/agent-company.test.mjs",
     "test:revenue": "node --experimental-strip-types tests/revenue.test.mjs",
     "test:platform": "node --experimental-strip-types tests/platform.test.mjs",
-    "test:platform-boundary": "node tests/platform-boundary.test.mjs"
+    "test:platform-boundary": "node --experimental-strip-types tests/platform-boundary.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
