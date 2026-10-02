@@ -11,7 +11,7 @@ export interface CommandCentreSnapshot {
   paymentStatus: string;
   deliveryEvidence: boolean;
   remotePayConfigured: boolean;
-  pocketBaseConfigured: boolean;
+  c6SaasCoreConfigured: boolean;
 }
 
 export interface CommandMetric {
@@ -51,7 +51,7 @@ export function buildCommandCentre(s: CommandCentreSnapshot): CommandCentreModel
   if (!s.locked && uploaded.has('NCNDA') && uploaded.has('IMFPA')) actions.push({id:'lock-chain',priority:'high',department:'Finance',action:'Review and lock the commission chain',reason:'NCNDA and IMFPA are present but the application lock is not recorded.'});
   if (!paymentConfirmed) actions.push({id:'payment',priority:'high',department:'Payments',action:'Reconcile RemotePay/provider status',reason:`Provider status is ${s.paymentStatus}; local UI state is not payment proof.`});
   if (s.status === 'escrow_secured' && !s.deliveryEvidence) actions.push({id:'delivery',priority:'high',department:'Trade Operations',action:'Obtain verified BL / delivery evidence',reason:'Close/release cannot proceed without delivery evidence.'});
-  if (s.pocketBaseConfigured) actions.push({id:'migration',priority:'medium',department:'Technology',action:'Route production persistence through C6 SaaS Core',reason:'PocketBase is a migration-era runtime and must not be treated as final production persistence.'});
+  if (s.c6SaasCoreConfigured) actions.push({id:'migration',priority:'medium',department:'Technology',action:'Route production persistence through C6 SaaS Core',reason:'C6 SaaS Core is the target persistence platform; runtime deployment is still required.'});
   if (!s.remotePayConfigured) actions.push({id:'remotepay-config',priority:'high',department:'Payments',action:'Configure the RemotePay integration server-side',reason:'Payment-link creation is not configured.'});
   if (lifecycleReady && actions.length === 0) actions.push({id:'evidence-complete',priority:'info',department:'CEO',action:'Record the completed evidence set',reason:'All supplied lifecycle conditions are present; external/legal outcomes remain evidence-bound.'});
 
@@ -62,7 +62,7 @@ export function buildCommandCentre(s: CommandCentreSnapshot): CommandCentreModel
     {label:'Documents',value:`${completeDocs}/${sequence.length}`,state:completeDocs===sequence.length?'ready':'attention',detail:missing.length?`Missing: ${missing.join(', ')}`:'Required document sequence uploaded.'},
     {label:'Commission',value:s.locked?'Locked':'Open',state:s.locked?'ready':'attention',detail:s.locked?'Application lock recorded.':'Lock requires the required signed evidence and authorization.'},
     {label:'Payment',value:s.paymentStatus,state:paymentConfirmed?'ready':'attention',detail:paymentConfirmed?'Provider status supplied as paid/confirmed.':'Provider reconciliation is still required.'},
-    {label:'Persistence',value:s.pocketBaseConfigured?'Legacy':'C6 target',state:s.pocketBaseConfigured?'attention':'ready',detail:s.pocketBaseConfigured?'PocketBase is migration-only.':'C6 PostgreSQL is the target platform; runtime proof still required.'},
+    {label:'Persistence',value:s.c6SaasCoreConfigured?'Legacy':'C6 target',state:s.c6SaasCoreConfigured?'attention':'ready',detail:s.c6SaasCoreConfigured?'C6 SaaS Core is the target platform.':'C6 PostgreSQL is the target platform; runtime proof still required.'},
   ];
 
   const lifecycle = [

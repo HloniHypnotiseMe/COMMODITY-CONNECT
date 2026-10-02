@@ -17,4 +17,3 @@ jobs:
       - run: npm test
       - run: npm run check
       - run: npm run build
-      - run: node --check pb_hooks/commodity.pb.js
