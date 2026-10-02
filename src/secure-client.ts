@@ -36,15 +36,3 @@ export const uploadDocumentEvidence = (token: string, dealId: string, documentId
   const body = new FormData(); body.append('file', file);
   return request<{ id: string; status: string }>('/v1/commodity-connect/deals/' + encodeURIComponent(dealId) + '/documents/' + encodeURIComponent(documentId) + '/evidence', { method: 'POST', body }, token);
 };
-
-export const verifyKyc = (kycId: string, notes = 'Operator verification completed') =>
-  request<Kyc>('/v1/commodity-connect/kyc/' + encodeURIComponent(kycId) + '/verify', { method: 'POST', body: JSON.stringify({ notes }), headers: { 'X-C6-Control-Key': String(import.meta.env.VITE_C6_CONTROL_KEY || '') } });
-
-export const verifyDocument = (dealId: string, documentId: string, notes = 'Operator verification completed') =>
-  request<{ id: string; type: string; verified: boolean }>('/v1/commodity-connect/deals/' + encodeURIComponent(dealId) + '/documents/' + encodeURIComponent(documentId) + '/verify', { method: 'POST', body: JSON.stringify({ notes }), headers: { 'X-C6-Control-Key': String(import.meta.env.VITE_C6_CONTROL_KEY || '') } });
-
-export const reconcileEscrow = (dealId: string, providerReference: string, providerStatus: string, evidence: Record<string, unknown>) =>
-  request<{ deal_id: string; escrow_status: string }>('/v1/commodity-connect/deals/' + encodeURIComponent(dealId) + '/escrow/reconcile', { method: 'POST', body: JSON.stringify({ provider_reference: providerReference, provider_status: providerStatus, payment_evidence: evidence }), headers: { 'X-C6-Control-Key': String(import.meta.env.VITE_C6_CONTROL_KEY || '') } });
-
-export const advanceLifecycle = (dealId: string, status: string) =>
-  request<{ id: string; status: string; commission_locked: boolean }>('/v1/commodity-connect/deals/' + encodeURIComponent(dealId) + '/lifecycle', { method: 'POST', body: JSON.stringify({ status }), headers: { 'X-C6-Control-Key': String(import.meta.env.VITE_C6_CONTROL_KEY || '') } });
