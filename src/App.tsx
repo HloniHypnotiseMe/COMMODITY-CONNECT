@@ -73,10 +73,11 @@ export default function App() {
   }
 
   async function saveDeal() {
+    if (dealId) return notice(`Deal ${dealId} is already persisted in C6 SaaS Core.`);
     if (!isConfigured.c6SaasCore) return notice('C6 SaaS Core is not configured for this environment.');
     setBusy(true); setMessage('');
     try {
-      const saved = await createDeal({ reference: dealId || `CC-${Date.now()}`, commodity, grade, volume, unit, unitPrice, currency, totalValue: total, totalCommissionPct: 3.5, participants: defaultParticipants.map(p => ({ userId: p.name, role: p.role, commissionPct: p.percentage, commissionAmount: p.amount, walletReady: p.walletReady })) });
+      const saved = await createDeal({ reference: dealId || `CC-${Date.now()}`, commodity, grade, volume, unit, unitPrice, currency, totalValue: total, totalCommissionPct: 3.5, participants: chain.map(p => ({ userId: p.name, role: p.role, commissionPct: p.percentage, commissionAmount: p.amount, walletReady: p.walletReady })) });
       setDealId(saved.id); setStatus(saved.status as DealStatus); setLocked(saved.commission_locked); notice(`Deal ${saved.reference} persisted in C6 SaaS Core.`);
     } catch (error) { notice(error instanceof Error ? error.message : 'Could not persist deal.'); }
     finally { setBusy(false); }
