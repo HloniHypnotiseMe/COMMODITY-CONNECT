@@ -281,7 +281,7 @@ export default function App() {
         <form onSubmit={authenticate} className="auth-form">
           {authMode === 'register' && <label>Name<input required value={name} onChange={e => setName(e.target.value)} /></label>}
           <label>Email<input required type="email" value={email} onChange={e => setEmail(e.target.value)} /></label>
-          <label>Password<input required type="password" minLength={12} value={password} onChange={e => setPassword(e.target.value)} /></label>
+          <label>Password<input required type="password" minLength={12} maxLength={72} value={password} onChange={e => setPassword(e.target.value)} /></label>
           {authMode === 'register' && <label>Identity/Government number<input required value={idNumber} onChange={e => setIdNumber(e.target.value)} /></label>}{authMode === 'register' && <label>Role<select value={role} onChange={e => setRole(e.target.value as Role)}>{roles.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>}
           <button className="primary" disabled={busy}>{busy ? 'Working…' : authMode === 'signin' ? 'Sign in' : 'Create account'} <ArrowRight size={16}/></button>
         </form>
