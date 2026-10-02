@@ -19,7 +19,6 @@
   "dependencies": {
     "@vitejs/plugin-react": "latest",
     "lucide-react": "latest",
-    "pocketbase": "latest",
     "react": "latest",
     "react-dom": "latest"
   },
