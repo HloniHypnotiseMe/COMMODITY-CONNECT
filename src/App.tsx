@@ -9,6 +9,7 @@ import { isConfigured } from './config';
 import { buildCommandCentre } from './command-centre';
 import { createRemotePayPaymentLink, getRemotePayPaymentLink } from './services';
 import { createDeal, addDealDocument, lockCommissionChain } from './runtime-client';
+import { createKyc, listMyKyc, loginIdentity, registerIdentity, uploadDocumentEvidence, uploadKycEvidence } from './secure-client';
 import type { CommissionParticipant, DealStatus, Role } from './types';
 
 const roles: { value: Role; label: string }[] = [
@@ -52,6 +53,10 @@ export default function App() {
   const [adminKyc, setAdminKyc] = useState<Array<{ id: string; legal_name: string; role: string }>>([]);
   const [adminDocs, setAdminDocs] = useState<Array<{ id: string; type: string; deal: string }>>([]);
   const [kycVerified, setKycVerified] = useState(false);
+  const [identityToken, setIdentityToken] = useState('');
+  const [idNumber, setIdNumber] = useState('');
+  const [kycProfiles, setKycProfiles] = useState<Array<{ id: string; legal_name: string; role: string; status: string; mandate_document_evidence_id?: string | null }>>([]);
+  const [kycId, setKycId] = useState('');
 
   const total = useMemo(() => dealValue(volume, unitPrice), [volume, unitPrice]);
   const chain = useMemo(() => commissionSnapshot(total, defaultParticipants), [total]);
@@ -69,7 +74,26 @@ export default function App() {
 
   async function authenticate(event: FormEvent) {
     event.preventDefault();
-    notice('Identity and production persistence are being migrated to C6 SaaS Core. This browser build does not accept or store credentials locally.');
+    if (!isConfigured.c6SaasCore) return notice('C6 SaaS Core is not configured for this environment.');
+    setBusy(true); setMessage('');
+    try {
+      const result = authMode === 'register'
+        ? await registerIdentity({ email, password, displayName: name, role })
+        : await loginIdentity(email, password);
+      setIdentityToken(result.access_token); setAuthenticated(true);
+      const profiles = await listMyKyc(result.access_token);
+      setKycProfiles(profiles); setKycId(profiles[0]?.id || '');
+      setKycVerified(profiles.some(profile => profile.status === 'verified'));
+      if (authMode === 'register') {
+        if (!idNumber.trim()) throw new Error('Government/identity number is required to create the initial KYC profile.');
+        const kyc = await createKyc(result.access_token, { legalName: name, role, idNumber });
+        setKycProfiles([kyc]); setKycId(kyc.id); setKycVerified(kyc.status === 'verified');
+      }
+      notice(authMode === 'register' ? 'Account and identity created in C6 SaaS Core.' : 'Signed in through C6 SaaS Core.');
+    } catch (error) {
+      setAuthenticated(false); setIdentityToken('');
+      notice(error instanceof Error ? error.message : 'Identity operation failed.');
+    } finally { setBusy(false); }
   }
 
   async function saveDeal() {
@@ -87,8 +111,10 @@ export default function App() {
     if (!dealId) return notice('Save the deal before uploading evidence.');
     setBusy(true); setMessage('');
     try {
-      await addDealDocument(dealId, { type, filename: file.name, sizeBytes: file.size, contentType: file.type || 'application/octet-stream' });
-      setDocuments(prev => prev.includes(type) ? prev : [...prev, type]); notice(`${type} metadata persisted in C6 SaaS Core. File bytes remain outside the API until object storage is connected.`);
+      if (!identityToken) return notice('Sign in before uploading evidence.');
+      const saved = await addDealDocument(dealId, { type, filename: file.name, sizeBytes: file.size, contentType: file.type || 'application/octet-stream' });
+      await uploadDocumentEvidence(identityToken, dealId, saved.id, file);
+      setDocuments(prev => prev.includes(type) ? prev : [...prev, type]); notice(type + ' evidence bytes and metadata persisted in C6 SaaS Core evidence storage.');
     } catch (error) { notice(error instanceof Error ? error.message : `Could not persist ${type}.`); }
     finally { setBusy(false); }
   }
@@ -159,7 +185,7 @@ export default function App() {
   return <div className="app">
     <header className="topbar">
       <div className="brand"><div className="mark">CC</div><div><strong>Commodity Connect</strong><span>C6 Group · Protected Deal Infrastructure</span></div></div>
-      <div className="top-actions"><span className="status-dot">{authenticated ? 'Authenticated' : 'Evidence-first'}</span>{authenticated ? <button className="ghost" onClick={() => { setAuthenticated(false); notice('Signed out.'); }}><LogOut size={16}/> Sign out</button> : <button className="ghost" onClick={() => document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' })}><KeyRound size={16}/> Sign in</button>}<button className="primary" onClick={() => document.getElementById('deal')?.scrollIntoView({ behavior: 'smooth' })}>Build a deal <ArrowRight size={16}/></button></div>
+      <div className="top-actions"><span className="status-dot">{authenticated ? 'Authenticated' : 'Evidence-first'}</span>{authenticated ? <button className="ghost" onClick={() => { setAuthenticated(false); setIdentityToken(''); setKycProfiles([]); setKycId(''); setKycVerified(false); notice('Signed out.'); }}><LogOut size={16}/> Sign out</button> : <button className="ghost" onClick={() => document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' })}><KeyRound size={16}/> Sign in</button>}<button className="primary" onClick={() => document.getElementById('deal')?.scrollIntoView({ behavior: 'smooth' })}>Build a deal <ArrowRight size={16}/></button></div>
     </header>
 
     <main>
@@ -218,6 +244,14 @@ export default function App() {
         </div>
       </section>
 
+      <section className="panel auth-panel" id="kyc">
+        <div className="panel-head"><div><span className="kicker">KYC</span><h2>Identity verification</h2></div><ShieldCheck/></div>
+        <p className="muted">Identity records are stored in C6 SaaS Core. Raw identity numbers are never stored; the server stores a one-way hash. Verification remains operator-controlled.</p>
+        {!authenticated ? <span className="muted">Sign in to manage KYC.</span> : <div className="admin-queue">
+          {kycProfiles.length === 0 ? <span className="muted">No KYC profile yet.</span> : kycProfiles.map(profile => <div className="queue-row" key={profile.id}><span>{profile.legal_name} · {profile.role} · {profile.status}</span>{profile.status !== 'verified' && <label className="ghost">Upload ID/mandate evidence<input type="file" accept="application/pdf,image/jpeg,image/png" disabled={busy} onChange={e => { const file = e.target.files?.[0]; if (file) void uploadKycEvidence(identityToken, profile.id, file).then(() => notice('KYC evidence uploaded and awaiting operator verification.')).catch(err => notice(err instanceof Error ? err.message : 'KYC evidence upload failed.')); }}/></label>}</div>)}
+        </div>}
+      </section>
+
       <section className="panel evidence-panel">
         <div className="panel-head"><div><span className="kicker">EVIDENCE VAULT</span><h2>Deal documents</h2></div><FileCheck2 size={20}/></div>
         <p className="muted">Upload evidence against a saved deal. Uploading a document does not mark it verified; verification belongs to the authorized verification workflow.</p>
@@ -247,8 +281,8 @@ export default function App() {
         <form onSubmit={authenticate} className="auth-form">
           {authMode === 'register' && <label>Name<input required value={name} onChange={e => setName(e.target.value)} /></label>}
           <label>Email<input required type="email" value={email} onChange={e => setEmail(e.target.value)} /></label>
-          <label>Password<input required type="password" minLength={8} value={password} onChange={e => setPassword(e.target.value)} /></label>
-          {authMode === 'register' && <label>Role<select value={role} onChange={e => setRole(e.target.value as Role)}>{roles.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>}
+          <label>Password<input required type="password" minLength={12} value={password} onChange={e => setPassword(e.target.value)} /></label>
+          {authMode === 'register' && <label>Identity/Government number<input required value={idNumber} onChange={e => setIdNumber(e.target.value)} /></label>}{authMode === 'register' && <label>Role<select value={role} onChange={e => setRole(e.target.value as Role)}>{roles.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>}
           <button className="primary" disabled={busy}>{busy ? 'Working…' : authMode === 'signin' ? 'Sign in' : 'Create account'} <ArrowRight size={16}/></button>
         </form>
         <button className="ghost" onClick={() => setAuthMode(authMode === 'signin' ? 'register' : 'signin')}>{authMode === 'signin' ? 'Create an account' : 'I already have an account'}</button>
