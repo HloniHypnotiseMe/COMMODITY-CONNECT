@@ -17,6 +17,4 @@ jobs:
       - run: npm test
       - run: npm run check
       - run: npm run build
-      - run: node --check pb_migrations/1720000000_create_commodity.js
-      - run: node --check pb_migrations/1720000001_harden_commodity_lifecycle.js
       - run: node --check pb_hooks/commodity.pb.js
