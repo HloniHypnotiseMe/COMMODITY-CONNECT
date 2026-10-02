@@ -7,7 +7,7 @@ import { buildFireIntelligence, fireHeadline } from './fire';
 import { agentCompanyHeadline, routeFindings } from './agent-company';
 import { isConfigured } from './config';
 import { buildCommandCentre } from './command-centre';
-import { createRemotePayPaymentLink, getRemotePayPaymentLink, pb } from './services';
+import { createRemotePayPaymentLink, getRemotePayPaymentLink } from './services';
 import type { CommissionParticipant, DealStatus, Role } from './types';
 
 const roles: { value: Role; label: string }[] = [
@@ -43,6 +43,7 @@ export default function App() {
   const [escrowId, setEscrowId] = useState('');
   const [busy, setBusy] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'register'>('signin');
+  const [authenticated, setAuthenticated] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -61,80 +62,25 @@ export default function App() {
   const paymentConfirmed = paymentStatus === 'paid';
   const deliveryEvidence = documents.includes('BL');
   const canAdvance = canAdvanceDeal(status, { paymentConfirmed, deliveryEvidence, chainLocked: locked });
-  const commandCentre = buildCommandCentre({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, pocketBaseConfigured: isConfigured.pocketBase });
+  const commandCentre = buildCommandCentre({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, c6SaasCoreConfigured: isConfigured.c6SaasCore });
 
   const notice = (text: string) => setMessage(text);
 
   async function authenticate(event: FormEvent) {
     event.preventDefault();
-    setBusy(true); setMessage('');
-    try {
-      if (authMode === 'signin') {
-        await pb.collection('_pb_users_auth_').authWithPassword(email, password);
-        const kyc = await pb.collection('kyc_profiles').getList(1, 1, { filter: `owner = "${pb.authStore.record?.id}" && status = "verified"` });
-        setKycVerified(kyc.totalItems > 0);
-        notice(`Signed in as ${pb.authStore.record?.email || email}.`);
-      } else {
-        await pb.collection('_pb_users_auth_').create({ email, password, passwordConfirm: password, name });
-        await pb.collection('_pb_users_auth_').authWithPassword(email, password);
-        await pb.collection('kyc_profiles').create({ owner: pb.authStore.record?.id, legal_name: name, role, status: 'pending' });
-        setKycVerified(false);
-        notice('Account created. KYC is pending verification.');
-      }
-    } catch (error) { notice(error instanceof Error ? error.message : 'Authentication failed.'); }
-    finally { setBusy(false); }
+    notice('Identity and production persistence are being migrated to C6 SaaS Core. This browser build does not accept or store credentials locally.');
   }
 
   async function saveDeal() {
-    if (!pb.authStore.isValid) return notice('Sign in before saving a production deal.');
-    setBusy(true); setMessage('');
-    try {
-      const termErrors = validateTradeTerms({ commodity, grade, volume, unit, unitPrice });
-      if (termErrors.length) return notice(termErrors.join(' '));
-      const reference = `CC-${Date.now().toString(36).toUpperCase()}`;
-      const record = await pb.collection('deals').create({
-        reference, created_by: pb.authStore.record?.id, commodity, grade, volume, unit,
-        unit_price: unitPrice, currency, total_value: total, status: 'open', total_commission_pct: 3.5,
-        commission_locked: false,
-      });
-      setDealId(record.id);
-      notice(`Deal ${reference} saved to PocketBase.`);
-    } catch (error) { notice(error instanceof Error ? error.message : 'Could not save deal.'); }
-    finally { setBusy(false); }
+    notice('C6 SaaS Core deal persistence is not deployed for this browser build yet. No local or PocketBase persistence is being used.');
   }
 
-  async function uploadDocument(file: File, type: string) {
-    if (!dealId || !pb.authStore.isValid) return notice('Save the deal and sign in before uploading evidence.');
-    const index = DOCUMENT_SEQUENCE.indexOf(type as typeof DOCUMENT_SEQUENCE[number]);
-    setBusy(true); setMessage('');
-    try {
-      const existing = await pb.collection('documents').getFullList({ filter: `deal = "\${dealId}"`, fields: 'type' });
-      const existingTypes = new Set(existing.map((doc) => String(doc.type)));
-      if (!canUploadDocument([...existingTypes], type)) {
-        const missing = DOCUMENT_SEQUENCE.slice(0, index).filter(step => !existingTypes.has(step));
-        throw new Error(`Sequence gate: upload ${missing.join(', ')} before ${type}.`);
-      }
-      const form = new FormData();
-      form.append('deal', dealId); form.append('type', type); form.append('sequence_index', String(index)); form.append('file', file); form.append('verified', 'false');
-      await pb.collection('documents').create(form);
-      setDocuments(prev => prev.includes(type) ? prev : [...prev, type]);
-      notice(`${type} uploaded. Upload does not mean verified.`);
-    } catch (error) { notice(error instanceof Error ? error.message : `Could not upload ${type}.`); }
-    finally { setBusy(false); }
+  async function uploadDocument(_file: File, _type: string) {
+    notice('C6 SaaS Core evidence persistence is not deployed for this browser build yet. No document was stored.');
   }
 
   async function lockChain() {
-    if (!dealId || !signedEvidence || !pb.authStore.isValid) return notice('NCNDA and IMFPA must be uploaded before the commission chain can be locked.');
-    setBusy(true); setMessage('');
-    try {
-      const snapshot = { locked_at: new Date().toISOString(), participants: chain };
-      await pb.collection('deals').update(dealId, { commission_locked: true, lock_evidence: [] });
-      const rows = chain.map(p => pb.collection('deal_participants').create({ deal: dealId, user: pb.authStore.record?.id, role: p.role, commission_pct: p.percentage, commission_amount: p.amount, wallet_ready: p.walletReady, locked_snapshot: snapshot }));
-      await Promise.all(rows);
-      setLocked(true);
-      notice('Commission chain locked in the application. Legal enforceability still depends on the signed agreements and applicable law.');
-    } catch (error) { notice(error instanceof Error ? error.message : 'Could not lock commission chain.'); }
-    finally { setBusy(false); }
+    notice('C6 SaaS Core commission-chain persistence is not deployed for this browser build yet. No lock was recorded.');
   }
 
   async function requestPayment() {
@@ -151,15 +97,7 @@ export default function App() {
         returnUrl: window.location.href,
         cancelUrl: window.location.href,
       });
-      await pb.collection('deals').update(dealId, { remote_pay_reference: payment.payment_id });
-      const escrow = await pb.collection('escrows').create({
-        deal: dealId,
-        remote_pay_reference: payment.payment_id,
-        status: 'pending',
-        provider_status: payment.status,
-        payment_evidence: { payment_id: payment.payment_id, status: payment.status, source: 'RemotePay' },
-      });
-      setEscrowId(escrow.id);
+
       setPaymentId(payment.payment_id); setPaymentStatus(payment.status); setPaymentUrl(payment.payment_url);
       notice(`RemotePay payment link created and linked to the deal. Status is ${payment.status}; this is not payment confirmation.`);
     } catch (error) { notice(error instanceof Error ? error.message : 'RemotePay payment-link request failed.'); }
@@ -181,39 +119,16 @@ export default function App() {
     finally { setBusy(false); }
   }
 
-  async function verifyDocument(id: string) {
-    if (pb.authStore.record?.platform_role !== 'admin') return notice('Admin verification permission is required.');
-    setBusy(true); setMessage('');
-    try {
-      await pb.collection('documents').update(id, { verified: true, verified_by: pb.authStore.record?.id, verification_notes: 'Verified by authorized Commodity Connect operator.' });
-      notice('Document verified.');
-    } catch (error) { notice(error instanceof Error ? error.message : 'Document verification failed.'); }
-    finally { setBusy(false); }
+  async function verifyDocument(_id: string) {
+    notice('C6 SaaS Core verification persistence is not deployed for this browser build yet.');
   }
 
-  async function verifyKyc(id: string, approved: boolean) {
-    if (pb.authStore.record?.platform_role !== 'admin') return notice('Admin verification permission is required.');
-    setBusy(true); setMessage('');
-    try {
-      await pb.collection('kyc_profiles').update(id, { status: approved ? 'verified' : 'rejected', verification_notes: approved ? 'Verified by authorized Commodity Connect operator.' : 'Rejected by authorized Commodity Connect operator.' });
-      notice(`KYC ${approved ? 'verified' : 'rejected'}.`);
-    } catch (error) { notice(error instanceof Error ? error.message : 'KYC verification failed.'); }
-    finally { setBusy(false); }
+  async function verifyKyc(_id: string, _approved: boolean) {
+    notice('C6 SaaS Core KYC verification persistence is not deployed for this browser build yet.');
   }
 
   async function adminReview() {
-    if (pb.authStore.record?.platform_role !== 'admin') return notice('Admin verification permission is required.');
-    setBusy(true); setMessage('');
-    try {
-      const [kyc, docs] = await Promise.all([
-        pb.collection('kyc_profiles').getFullList({ filter: 'status = "pending"', sort: '-created', fields: 'id,legal_name,role' }),
-        pb.collection('documents').getFullList({ filter: 'verified = false', sort: '-created', fields: 'id,type,deal' }),
-      ]);
-      setAdminKyc(kyc.map(doc => ({ id: doc.id, legal_name: String(doc.get('legal_name')), role: String(doc.get('role')) })));
-      setAdminDocs(docs.map(doc => ({ id: doc.id, type: String(doc.get('type')), deal: String(doc.get('deal')) })));
-      notice(`Admin queue loaded: ${kyc.length} pending KYC profile(s), ${docs.length} unverified document(s).`);
-    } catch (error) { notice(error instanceof Error ? error.message : 'Could not load admin queue.'); }
-    finally { setBusy(false); }
+    notice('C6 SaaS Core admin verification workspace is not deployed for this browser build yet.');
   }
 
   function advanceDemo() {
@@ -226,7 +141,7 @@ export default function App() {
   return <div className="app">
     <header className="topbar">
       <div className="brand"><div className="mark">CC</div><div><strong>Commodity Connect</strong><span>C6 Group · Protected Deal Infrastructure</span></div></div>
-      <div className="top-actions"><span className="status-dot">{pb.authStore.isValid ? 'Authenticated' : 'Evidence-first'}</span>{pb.authStore.isValid ? <button className="ghost" onClick={() => { pb.authStore.clear(); notice('Signed out.'); }}><LogOut size={16}/> Sign out</button> : <button className="ghost" onClick={() => document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' })}><KeyRound size={16}/> Sign in</button>}<button className="primary" onClick={() => document.getElementById('deal')?.scrollIntoView({ behavior: 'smooth' })}>Build a deal <ArrowRight size={16}/></button></div>
+      <div className="top-actions"><span className="status-dot">{authenticated ? 'Authenticated' : 'Evidence-first'}</span>{authenticated ? <button className="ghost" onClick={() => { setAuthenticated(false); notice('Signed out.'); }}><LogOut size={16}/> Sign out</button> : <button className="ghost" onClick={() => document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth' })}><KeyRound size={16}/> Sign in</button>}<button className="primary" onClick={() => document.getElementById('deal')?.scrollIntoView({ behavior: 'smooth' })}>Build a deal <ArrowRight size={16}/></button></div>
     </header>
 
     <main>
@@ -241,9 +156,9 @@ export default function App() {
 
       <section className="panel fire-panel" id="fire">
         <div className="panel-head"><div><span className="kicker">FIRE CORE</span><h2>Operational intelligence</h2></div><span className="pill">LIVE STATE</span></div>
-        <p className="muted">{fireHeadline(buildFireIntelligence({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, pocketBaseConfigured: isConfigured.pocketBase }))}</p>
+        <p className="muted">{fireHeadline(buildFireIntelligence({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, c6SaasCoreConfigured: isConfigured.c6SaasCore }))}</p>
         <div className="fire-grid">
-          {buildFireIntelligence({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, pocketBaseConfigured: isConfigured.pocketBase }).map(finding => <article className="fire-card" key={finding.id}>
+          {buildFireIntelligence({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, c6SaasCoreConfigured: isConfigured.c6SaasCore }).map(finding => <article className="fire-card" key={finding.id}>
             <div className="fire-card-head"><span className={`fire-severity ${finding.severity}`}>{finding.severity}</span><span className="fire-dept">{finding.department}</span></div>
             <strong>{finding.title}</strong>
             <span>{finding.reason}</span>
@@ -252,7 +167,7 @@ export default function App() {
           </article>)}
         </div>
         <small className="config-line">FIRE is deterministic in Wave 2: it reads supplied application/provider state and does not invent payment, legal, verification or custody facts.</small>
-        {(() => { const handoffs = routeFindings(buildFireIntelligence({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, pocketBaseConfigured: isConfigured.pocketBase })); return <div className="agent-company-box"><div className="panel-head"><div><span className="kicker">AGENT COMPANY</span><strong>{agentCompanyHeadline(handoffs)}</strong></div><span className="pill">PERMISSIONED</span></div><div className="handoff-list">{handoffs.slice(0,6).map(h => <div className="handoff-row" key={h.id}><span>{h.to}</span><strong>{h.status.replace('_',' ')}</strong><small>{h.action}{h.requiredApproval ? ` · approval: ${h.requiredApproval}` : ''}</small></div>)}</div></div> })()}
+        {(() => { const handoffs = routeFindings(buildFireIntelligence({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, c6SaasCoreConfigured: isConfigured.c6SaasCore })); return <div className="agent-company-box"><div className="panel-head"><div><span className="kicker">AGENT COMPANY</span><strong>{agentCompanyHeadline(handoffs)}</strong></div><span className="pill">PERMISSIONED</span></div><div className="handoff-list">{handoffs.slice(0,6).map(h => <div className="handoff-row" key={h.id}><span>{h.to}</span><strong>{h.status.replace('_',' ')}</strong><small>{h.action}{h.requiredApproval ? ` · approval: ${h.requiredApproval}` : ''}</small></div>)}</div></div> })()}
       </section>
 
       <section className="panel command-centre" id="command-centre">
@@ -273,7 +188,7 @@ export default function App() {
           <div className="value-box"><span>Indicative deal value</span><strong>{money(total, currency)}</strong><small>Calculation only — not a payment confirmation.</small></div>
           <div className="two"><button className="primary full" disabled={busy} onClick={saveDeal}>{dealId ? 'Deal saved' : 'Save deal'} <CheckCircle2 size={16}/></button><button className="ghost full" disabled={busy || !dealId || !isConfigured.remotePay} onClick={requestPayment}>Request payment <CircleDollarSign size={16}/></button></div>
           {paymentId && <div className="payment-box"><strong>RemotePay payment</strong><span>{paymentId} · {paymentStatus}{escrowId ? ` · escrow ${escrowId}` : ''}</span>{paymentUrl && <a href={paymentUrl} target="_blank" rel="noreferrer">Open hosted checkout <ArrowRight size={14}/></a>}<button className="ghost full" disabled={busy} onClick={refreshPayment}><RefreshCw size={14}/> Refresh provider status</button></div>}
-          <small className="config-line">PocketBase: {isConfigured.pocketBase ? 'configured' : 'not configured'} · RemotePay: {isConfigured.remotePay ? 'configured' : 'external configuration required'}</small>
+          <small className="config-line">C6 persistence: {isConfigured.c6SaasCore ? 'configured' : 'not deployed'} · RemotePay: {isConfigured.remotePay ? 'configured' : 'external configuration required'}</small>
         </div>
 
         <div className="panel chain">
@@ -302,7 +217,7 @@ export default function App() {
         <div className="chips">{filtered.map(c => <span key={c}>{c}</span>)}</div>
       </section>
 
-      {pb.authStore.record?.platform_role === 'admin' && <section className="panel auth-panel" id="admin">
+      {false && <section className="panel auth-panel" id="admin">
         <div className="panel-head"><div><span className="kicker">ADMIN</span><h2>Verification controls</h2></div><ShieldCheck/></div>
         <p className="muted">Authorized operators can review pending KYC and document evidence. The server enforces the admin role; normal users cannot self-assign it.</p>
         <div className="hero-actions"><button className="primary" disabled={busy} onClick={adminReview}>Refresh verification queue <RefreshCw size={15}/></button></div>
