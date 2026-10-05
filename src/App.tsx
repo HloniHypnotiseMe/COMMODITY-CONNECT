@@ -99,9 +99,10 @@ export default function App() {
   async function saveDeal() {
     if (dealId) return notice(`Deal ${dealId} is already persisted in C6 SaaS Core.`);
     if (!isConfigured.c6SaasCore) return notice('C6 SaaS Core is not configured for this environment.');
+    if (!identityToken) return notice('Sign in before saving a deal.');
     setBusy(true); setMessage('');
     try {
-      const saved = await createDeal({ reference: dealId || `CC-${Date.now()}`, commodity, grade, volume, unit, unitPrice, currency, totalValue: total, totalCommissionPct: 3.5, participants: chain.map(p => ({ userId: p.name, role: p.role, commissionPct: p.percentage, commissionAmount: p.amount, walletReady: p.walletReady })) });
+      const saved = await createDeal(identityToken, { reference: dealId || `CC-${Date.now()}`, commodity, grade, volume, unit, unitPrice, currency, totalValue: total, totalCommissionPct: 3.5, participants: chain.map(p => ({ userId: p.name, role: p.role, commissionPct: p.percentage, commissionAmount: p.amount, walletReady: p.walletReady })) });
       setDealId(saved.id); setStatus(saved.status as DealStatus); setLocked(saved.commission_locked); notice(`Deal ${saved.reference} persisted in C6 SaaS Core.`);
     } catch (error) { notice(error instanceof Error ? error.message : 'Could not persist deal.'); }
     finally { setBusy(false); }
@@ -112,7 +113,7 @@ export default function App() {
     setBusy(true); setMessage('');
     try {
       if (!identityToken) return notice('Sign in before uploading evidence.');
-      const saved = await addDealDocument(dealId, { type, filename: file.name, sizeBytes: file.size, contentType: file.type || 'application/octet-stream' });
+      const saved = await addDealDocument(identityToken, dealId, { type, filename: file.name, sizeBytes: file.size, contentType: file.type || 'application/octet-stream' });
       await uploadDocumentEvidence(identityToken, dealId, saved.id, file);
       setDocuments(prev => prev.includes(type) ? prev : [...prev, type]); notice(type + ' evidence bytes and metadata persisted in C6 SaaS Core evidence storage.');
     } catch (error) { notice(error instanceof Error ? error.message : `Could not persist ${type}.`); }
@@ -122,7 +123,7 @@ export default function App() {
   async function lockChain() {
     if (!dealId) return notice('Save the deal before locking the commission chain.');
     setBusy(true); setMessage('');
-    try { const saved = await lockCommissionChain(dealId); setLocked(saved.commission_locked); notice('Commission chain lock persisted and enforced by C6 SaaS Core.'); }
+    try { if (!identityToken) return notice('Sign in before locking the commission chain.'); const saved = await lockCommissionChain(identityToken, dealId); setLocked(saved.commission_locked); notice('Commission chain lock persisted and enforced by C6 SaaS Core.'); }
     catch (error) { notice(error instanceof Error ? error.message : 'Commission-chain lock failed.'); }
     finally { setBusy(false); }
   }
@@ -140,7 +141,7 @@ export default function App() {
         metadata: { deal_id: dealId, commodity, source: 'commodity-connect' },
         returnUrl: window.location.href,
         cancelUrl: window.location.href,
-      });
+      }, identityToken);
 
       setPaymentId(payment.payment_id); setPaymentStatus(payment.status); setPaymentUrl(payment.payment_url);
       notice(`RemotePay payment link created and linked to the deal. Status is ${payment.status}; this is not payment confirmation.`);
@@ -152,7 +153,7 @@ export default function App() {
     if (!paymentId) return notice('No RemotePay payment has been created.');
     setBusy(true); setMessage('');
     try {
-      const payment = await getRemotePayPaymentLink(paymentId);
+      const payment = await getRemotePayPaymentLink(paymentId, identityToken);
       setPaymentStatus(payment.status); setPaymentUrl(payment.payment_url || paymentUrl);
       if (escrowId) {
         notice(`RemotePay reports payment status: ${payment.status}. Escrow remains provider-reconciliation gated until an authorized operator records confirmation.`);
