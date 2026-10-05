@@ -54,3 +54,14 @@ PocketBase-era application data paths remain only as migration/dev compatibility
 - Crypto settlement is disabled until a real supported rail is verified.
 - C6 control-plane credentials never enter browser bundles.
 - No product may create a second direct RemotePay integration when the shared C6 adapter is the authoritative payment boundary.
+
+
+## C6-native deployment
+
+Production deployment is owned by the C6 deployment stack: C6-Os -> c6-deploy -> Contabo Node 01 -> Docker/Compose -> Caddy/Cloudflare.
+
+The frontend is built with a root URL base so it can be served directly from its assigned C6 domain by the Caddy hosting edge.
+
+Deployment-time browser configuration uses VITE_C6_SAAS_CORE_URL and VITE_C6_PRODUCT_KEY. These are bounded browser configuration values; C6 control-plane and payment-provider secrets remain server-side.
+
+A successful frontend build is not a LIVE claim. LIVE requires external HTTPS verification and the authenticated identity, evidence, deal lifecycle and payment/provider verification gates defined by C6 SaaS Core.
