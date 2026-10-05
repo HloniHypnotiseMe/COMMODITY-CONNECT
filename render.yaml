@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: commodity-connect
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_C6_SAAS_CORE_URL
+        sync: false
+      - key: VITE_C6_PRODUCT_KEY
+        sync: false
