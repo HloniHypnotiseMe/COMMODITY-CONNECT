@@ -26,32 +26,33 @@ export function requireC6PlatformUrl(): string {
   return url;
 }
 
-function productHeaders(): Record<string, string> {
+function productHeaders(token = ''): Record<string, string> {
   const key = String(import.meta.env.VITE_C6_PRODUCT_KEY || '').trim();
   if (!key) throw new Error('C6 product capability key is not configured for this environment.');
-  return { 'X-C6-Product-Key': key };
+  return { 'X-C6-Product-Key': key, ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 }
 
-async function platformRequest<T>(path: string, init: RequestInit): Promise<T> {
+async function platformRequest<T>(path: string, init: RequestInit, token = ''): Promise<T> {
   const response = await fetch(`${requireC6PlatformUrl()}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...productHeaders(), ...(init.headers || {}) },
+    headers: { 'Content-Type': 'application/json', ...productHeaders(token), ...(init.headers || {}) },
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.detail || body.message || `C6 SaaS Core returned HTTP ${response.status}`);
   return body as T;
 }
 
-export function createPlatformPaymentLink(request: PlatformPaymentLinkRequest) {
+export function createPlatformPaymentLink(request: PlatformPaymentLinkRequest, token: string) {
   return platformRequest<PlatformPaymentLinkResponse>('/v1/commodity-connect/payment-links', {
     method: 'POST',
     body: JSON.stringify(request),
-  });
+  }, token);
 }
 
-export function getPlatformPaymentLink(paymentId: string) {
+export function getPlatformPaymentLink(paymentId: string, token: string) {
   return platformRequest<PlatformPaymentLinkResponse>(
     `/v1/commodity-connect/payment-links/${encodeURIComponent(paymentId)}`,
     { method: 'GET' },
+    token,
   );
 }
