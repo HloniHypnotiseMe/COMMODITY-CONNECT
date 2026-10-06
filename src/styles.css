@@ -20,3 +20,13 @@
 .handoff-row strong { text-transform:uppercase; font-size:10px; letter-spacing:.07em; }
 .handoff-row small { opacity:.75; }
 @media (max-width: 700px) { .handoff-row { grid-template-columns: 1fr; } }
+
+.role-centre{max-width:1120px;margin:18px auto 0}
+.role-priorities{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.role-priority{display:flex;gap:12px;align-items:flex-start;border:1px solid #243b53;border-radius:10px;padding:14px;background:#091a2c}
+.role-priority strong,.role-priority small{display:block}
+.role-priority small{color:#8094aa;font-size:11px;line-height:1.45;margin-top:5px}
+.role-permissions{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;padding-top:14px;border-top:1px solid #1d3044}
+.role-permissions strong{width:100%;font-size:11px}
+.role-permissions span{font-size:10px;color:#91a4b9;border:1px solid #29445c;border-radius:999px;padding:6px 9px}
+@media(max-width:900px){.role-priorities{grid-template-columns:1fr}}
