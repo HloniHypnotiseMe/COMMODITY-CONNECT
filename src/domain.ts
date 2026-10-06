@@ -1,20 +1,11 @@
 import type { CommissionParticipant, Commodity, DealStatus } from './types';
 
 export const DEAL_STATUSES: DealStatus[] = ['open', 'escrow_secured', 'closed'];
-
-/**
- * Product workflow contract. This is an application sequencing rule, not a
- * statement that any document has a particular legal effect in every market.
- */
 export const DOCUMENT_SEQUENCE = ['LOI', 'BCL', 'FCO', 'SCO', 'POP', 'SGS', 'BL', 'NCNDA', 'IMFPA'] as const;
 export type DocumentType = typeof DOCUMENT_SEQUENCE[number];
-
 export type TradeUnit = 'MT' | 'KG' | 'Oz' | 'L' | 'Carat';
 
-export interface CommoditySpec {
-  allowedUnits: readonly TradeUnit[];
-  gradeRequired: boolean;
-}
+export interface CommoditySpec { allowedUnits: readonly TradeUnit[]; gradeRequired: boolean; }
 
 const MT: readonly TradeUnit[] = ['MT'];
 const MT_KG: readonly TradeUnit[] = ['MT', 'KG'];
@@ -23,32 +14,23 @@ const LIQUID: readonly TradeUnit[] = ['L'];
 const CARAT_KG: readonly TradeUnit[] = ['Carat', 'KG'];
 
 export const COMMODITY_SPECS: Record<Commodity, CommoditySpec> = {
-  'Coal RB1': { allowedUnits: MT, gradeRequired: true },
-  'Coal RB2': { allowedUnits: MT, gradeRequired: true },
-  'Chrome 42%': { allowedUnits: MT, gradeRequired: true },
-  'Manganese': { allowedUnits: MT, gradeRequired: true },
-  'Gold 99.99%': { allowedUnits: OZ_KG, gradeRequired: true },
-  'Platinum': { allowedUnits: OZ_KG, gradeRequired: true },
-  'Palladium': { allowedUnits: OZ_KG, gradeRequired: true },
-  'Rhodium': { allowedUnits: OZ_KG, gradeRequired: true },
-  'Iron Ore': { allowedUnits: MT, gradeRequired: true },
-  'Copper': { allowedUnits: MT_KG, gradeRequired: true },
-  'Cobalt': { allowedUnits: MT_KG, gradeRequired: true },
-  'Lithium': { allowedUnits: MT_KG, gradeRequired: true },
-  'Diamond': { allowedUnits: CARAT_KG, gradeRequired: true },
-  'Uranium': { allowedUnits: MT_KG, gradeRequired: true },
-  'Vanadium': { allowedUnits: MT_KG, gradeRequired: true },
-  'Titanium': { allowedUnits: MT_KG, gradeRequired: true },
-  'Diesel 50ppm': { allowedUnits: LIQUID, gradeRequired: true },
-  'Diesel 500ppm': { allowedUnits: LIQUID, gradeRequired: true },
-  'Petrol': { allowedUnits: LIQUID, gradeRequired: true },
-  'Sugar ICUMSA 45': { allowedUnits: MT, gradeRequired: true },
-  'Maize': { allowedUnits: MT, gradeRequired: true },
-  'Nickel': { allowedUnits: MT_KG, gradeRequired: true },
+  'Coal RB1': { allowedUnits: MT, gradeRequired: true }, 'Coal RB2': { allowedUnits: MT, gradeRequired: true },
+  'Chrome 42%': { allowedUnits: MT, gradeRequired: true }, 'Manganese': { allowedUnits: MT, gradeRequired: true },
+  'Gold 99.99%': { allowedUnits: OZ_KG, gradeRequired: true }, 'Platinum': { allowedUnits: OZ_KG, gradeRequired: true },
+  'Palladium': { allowedUnits: OZ_KG, gradeRequired: true }, 'Rhodium': { allowedUnits: OZ_KG, gradeRequired: true },
+  'Iron Ore': { allowedUnits: MT, gradeRequired: true }, 'Copper': { allowedUnits: MT_KG, gradeRequired: true },
+  'Cobalt': { allowedUnits: MT_KG, gradeRequired: true }, 'Lithium': { allowedUnits: MT_KG, gradeRequired: true },
+  'Diamond': { allowedUnits: CARAT_KG, gradeRequired: true }, 'Uranium': { allowedUnits: MT_KG, gradeRequired: true },
+  'Vanadium': { allowedUnits: MT_KG, gradeRequired: true }, 'Titanium': { allowedUnits: MT_KG, gradeRequired: true },
+  'Diesel 50ppm': { allowedUnits: LIQUID, gradeRequired: true }, 'Diesel 500ppm': { allowedUnits: LIQUID, gradeRequired: true },
+  'Petrol': { allowedUnits: LIQUID, gradeRequired: true }, 'Sugar ICUMSA 45': { allowedUnits: MT, gradeRequired: true },
+  'Maize': { allowedUnits: MT, gradeRequired: true }, 'Nickel': { allowedUnits: MT_KG, gradeRequired: true },
 };
 
 export function getCommoditySpec(commodity: Commodity): CommoditySpec {
-  return COMMODITY_SPECS[commodity];
+  const spec = COMMODITY_SPECS[commodity];
+  if (!spec) throw new Error(`Unsupported commodity: ${commodity}.`);
+  return spec;
 }
 
 export function isAllowedUnit(commodity: Commodity, unit: string): unit is TradeUnit {
@@ -82,6 +64,12 @@ export function canAdvanceDeal(status: DealStatus, evidence: { paymentConfirmed:
 }
 
 export function commissionSnapshot(totalValue: number, participants: CommissionParticipant[]) {
+  if (!Number.isFinite(totalValue) || totalValue < 0) throw new Error('Total value must be finite and non-negative.');
+  for (const participant of participants) {
+    if (!Number.isFinite(participant.percentage) || participant.percentage < 0 || participant.percentage > 100) {
+      throw new Error('Commission percentage must be between 0 and 100.');
+    }
+  }
   return participants.map((participant) => ({
     ...participant,
     amount: Math.round(totalValue * (participant.percentage / 100) * 100) / 100,
