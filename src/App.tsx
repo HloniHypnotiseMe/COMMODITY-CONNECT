@@ -2,7 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { ArrowRight, CheckCircle2, CircleDollarSign, FileCheck2, FileUp, KeyRound, LockKeyhole, LogOut, Search, ShieldCheck, UserPlus, Wallet, RefreshCw } from 'lucide-react';
 import { commodities, demoDeal } from './data';
 import { commissionAmount, dealValue, money } from './lib';
-import { canAdvanceDeal, canUploadDocument, commissionSnapshot, DOCUMENT_SEQUENCE, getCommoditySpec, validateTradeTerms, type TradeUnit } from './domain';
+import { canAdvanceDeal, canUploadDocument, commissionSnapshot, DOCUMENT_SEQUENCE, getCommoditySpec, isPaymentConfirmed, validateTradeTerms, type TradeUnit } from './domain';
 import { buildFireIntelligence, fireHeadline } from './fire';
 import { agentCompanyHeadline, routeFindings } from './agent-company';
 import { isConfigured } from './config';
