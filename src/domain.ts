@@ -1,5 +1,7 @@
 import type { CommissionParticipant, Commodity, DealStatus } from './types';
 
+export function isPaymentConfirmed(status: string): boolean { return ['paid', 'confirmed'].includes(String(status).toLowerCase()); }
+
 export const DEAL_STATUSES: DealStatus[] = ['open', 'escrow_secured', 'closed'];
 export const DOCUMENT_SEQUENCE = ['LOI', 'BCL', 'FCO', 'SCO', 'POP', 'SGS', 'BL', 'NCNDA', 'IMFPA'] as const;
 export type DocumentType = typeof DOCUMENT_SEQUENCE[number];
@@ -65,11 +67,14 @@ export function canAdvanceDeal(status: DealStatus, evidence: { paymentConfirmed:
 
 export function commissionSnapshot(totalValue: number, participants: CommissionParticipant[]) {
   if (!Number.isFinite(totalValue) || totalValue < 0) throw new Error('Total value must be finite and non-negative.');
+  let percentageTotal = 0;
   for (const participant of participants) {
     if (!Number.isFinite(participant.percentage) || participant.percentage < 0 || participant.percentage > 100) {
       throw new Error('Commission percentage must be between 0 and 100.');
     }
+    percentageTotal += participant.percentage;
   }
+  if (percentageTotal > 100) throw new Error('Total commission percentage cannot exceed 100%.');
   return participants.map((participant) => ({
     ...participant,
     amount: Math.round(totalValue * (participant.percentage / 100) * 100) / 100,

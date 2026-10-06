@@ -2,7 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { ArrowRight, CheckCircle2, CircleDollarSign, FileCheck2, FileUp, KeyRound, LockKeyhole, LogOut, Search, ShieldCheck, UserPlus, Wallet, RefreshCw } from 'lucide-react';
 import { commodities, demoDeal } from './data';
 import { commissionAmount, dealValue, money } from './lib';
-import { canAdvanceDeal, canUploadDocument, commissionSnapshot, DOCUMENT_SEQUENCE, getCommoditySpec, validateTradeTerms, type TradeUnit } from './domain';
+import { canAdvanceDeal, canUploadDocument, commissionSnapshot, DOCUMENT_SEQUENCE, getCommoditySpec, isPaymentConfirmed, validateTradeTerms, type TradeUnit } from './domain';
 import { buildFireIntelligence, fireHeadline } from './fire';
 import { agentCompanyHeadline, routeFindings } from './agent-company';
 import { isConfigured } from './config';
@@ -65,7 +65,7 @@ export default function App() {
   const signedEvidence = documents.includes('NCNDA') && documents.includes('IMFPA');
   const unitOptions = getCommoditySpec(commodity).allowedUnits;
   const nextDocument = DOCUMENT_SEQUENCE.find(type => !documents.includes(type)) ?? null;
-  const paymentConfirmed = paymentStatus === 'paid';
+  const paymentConfirmed = isPaymentConfirmed(paymentStatus);
   const deliveryEvidence = documents.includes('BL');
   const canAdvance = canAdvanceDeal(status, { paymentConfirmed, deliveryEvidence, chainLocked: locked });
   const commandCentre = buildCommandCentre({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, c6SaasCoreConfigured: isConfigured.c6SaasCore });
