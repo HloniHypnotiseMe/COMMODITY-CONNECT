@@ -28,7 +28,9 @@ export const COMMODITY_SPECS: Record<Commodity, CommoditySpec> = {
 };
 
 export function getCommoditySpec(commodity: Commodity): CommoditySpec {
-  return COMMODITY_SPECS[commodity];
+  const spec = COMMODITY_SPECS[commodity];
+  if (!spec) throw new Error(`Unsupported commodity: ${commodity}.`);
+  return spec;
 }
 
 export function isAllowedUnit(commodity: Commodity, unit: string): unit is TradeUnit {
@@ -62,6 +64,12 @@ export function canAdvanceDeal(status: DealStatus, evidence: { paymentConfirmed:
 }
 
 export function commissionSnapshot(totalValue: number, participants: CommissionParticipant[]) {
+  if (!Number.isFinite(totalValue) || totalValue < 0) throw new Error('Total value must be finite and non-negative.');
+  for (const participant of participants) {
+    if (!Number.isFinite(participant.percentage) || participant.percentage < 0 || participant.percentage > 100) {
+      throw new Error('Commission percentage must be between 0 and 100.');
+    }
+  }
   return participants.map((participant) => ({
     ...participant,
     amount: Math.round(totalValue * (participant.percentage / 100) * 100) / 100,
