@@ -6,7 +6,7 @@ import { canAdvanceDeal, canUploadDocument, commissionSnapshot, DOCUMENT_SEQUENC
 import { buildFireIntelligence, fireHeadline } from './fire';
 import { agentCompanyHeadline, routeFindings } from './agent-company';
 import { isConfigured } from './config';
-import { buildCommandCentre } from './command-centre';
+import { buildCommandCentre, buildRoleDashboard } from './command-centre';
 import { createRemotePayPaymentLink, getRemotePayPaymentLink } from './services';
 import { createDeal, addDealDocument, lockCommissionChain } from './runtime-client';
 import { createKyc, listMyKyc, loginIdentity, registerIdentity, uploadDocumentEvidence, uploadKycEvidence } from './secure-client';
@@ -69,6 +69,7 @@ export default function App() {
   const deliveryEvidence = documents.includes('BL');
   const canAdvance = canAdvanceDeal(status, { paymentConfirmed, deliveryEvidence, chainLocked: locked });
   const commandCentre = buildCommandCentre({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, c6SaasCoreConfigured: isConfigured.c6SaasCore });
+  const roleDashboard = buildRoleDashboard(role, { dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, c6SaasCoreConfigured: isConfigured.c6SaasCore });
 
   const notice = (text: string) => setMessage(text);
 
@@ -213,6 +214,18 @@ export default function App() {
         </div>
         <small className="config-line">FIRE is deterministic in Wave 2: it reads supplied application/provider state and does not invent payment, legal, verification or custody facts.</small>
         {(() => { const handoffs = routeFindings(buildFireIntelligence({ dealId, status, kycVerified, documents, locked, paymentStatus, deliveryEvidence, remotePayConfigured: isConfigured.remotePay, c6SaasCoreConfigured: isConfigured.c6SaasCore })); return <div className="agent-company-box"><div className="panel-head"><div><span className="kicker">AGENT COMPANY</span><strong>{agentCompanyHeadline(handoffs)}</strong></div><span className="pill">PERMISSIONED</span></div><div className="handoff-list">{handoffs.slice(0,6).map(h => <div className="handoff-row" key={h.id}><span>{h.to}</span><strong>{h.status.replace('_',' ')}</strong><small>{h.action}{h.requiredApproval ? ` · approval: ${h.requiredApproval}` : ''}</small></div>)}</div></div> })()}
+      </section>
+
+      <section className="panel role-centre" id="role-centre">
+        <div className="panel-head"><div><span className="kicker">ROLE OPERATING VIEW</span><h2>Your operating lane</h2></div><span className="pill">{roleDashboard.role.replace('_',' ')}</span></div>
+        <p className="muted">{roleDashboard.mission}</p>
+        <div className="role-priorities">
+          {roleDashboard.priorities.map(item => <article className="role-priority" key={item.action}>
+            <span className={`command-priority ${item.priority}`}>{item.priority}</span>
+            <div><strong>{item.action}</strong><small>{item.reason}</small></div>
+          </article>)}
+        </div>
+        <div className="role-permissions"><strong>Operating boundary</strong>{roleDashboard.permissions.map(permission => <span key={permission}>{permission}</span>)}</div>
       </section>
 
       <section className="panel command-centre" id="command-centre">
