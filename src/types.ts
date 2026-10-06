@@ -27,4 +27,5 @@ export interface CommissionParticipant {
   percentage: number;
   amount: number;
   walletReady: boolean;
+  walletDestination?: string | null;
 }
