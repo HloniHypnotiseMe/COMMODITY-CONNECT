@@ -19,13 +19,24 @@ const agents: AgentDefinition[] = [
 ];
 
 export function getAgent(department: AgentDepartment) { return agents.find(a => a.department === department); }
+
+function approvalOwner(department: AgentDepartment): AgentHandoff['requiredApproval'] {
+ if (department === 'Trade Operations') return 'CEO';
+ if (department === 'Risk & Compliance') return 'Risk & Compliance';
+ if (department === 'Finance') return 'Finance';
+ if (department === 'Payments') return 'Payments';
+ if (department === 'Verification') return 'Verification';
+ return undefined;
+}
+
 export function routeFireFinding(finding: FireFinding): AgentHandoff {
  const department = finding.department === 'CEO' ? 'Trade Operations' : finding.department;
  const agent = getAgent(department);
  if (!agent) return {id:`handoff-${finding.id}`,findingId:finding.id,from:'FIRE',to:department,status:'blocked',action:finding.nextAction};
  const needsApproval = agent.role === 'approver' || finding.severity === 'critical';
- const approval = department === 'Risk & Compliance' ? 'Risk & Compliance' : department === 'Finance' ? 'Finance' : department === 'Payments' ? 'Payments' : department === 'Verification' ? 'Verification' : undefined;
- return {id:`handoff-${finding.id}`,findingId:finding.id,from:'FIRE',to:department,status:needsApproval ? 'approval_required' : 'ready',action:finding.nextAction,requiredApproval:needsApproval ? approval : undefined};
+ const requiredApproval = needsApproval ? approvalOwner(department) : undefined;
+ if (needsApproval && !requiredApproval) return {id:`handoff-${finding.id}`,findingId:finding.id,from:'FIRE',to:department,status:'blocked',action:finding.nextAction};
+ return {id:`handoff-${finding.id}`,findingId:finding.id,from:'FIRE',to:department,status:needsApproval ? 'approval_required' : 'ready',action:finding.nextAction,requiredApproval};
 }
 export function routeFindings(findings: FireFinding[]): AgentHandoff[] { return findings.map(routeFireFinding); }
 export function agentCompanyHeadline(handoffs: AgentHandoff[]): string {
