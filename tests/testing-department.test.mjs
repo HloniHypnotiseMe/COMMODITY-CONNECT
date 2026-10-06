@@ -31,8 +31,8 @@ for (const required of [
   'Verification authority',
   'Financial release',
   'Crypto settlement',
-  'UI state is not payment evidence',
-  'RemotePay/provider evidence is the payment truth boundary',
+  'UI explicitly distinguishes payment-link creation from actual payment confirmation',
+  'RemotePay/provider evidence',
 ]) assert.ok(productionGates.includes(required), required);
 
 assert.ok(reconciliation.includes('Anything not evidenced is marked **UNVERIFIED**, **PLANNED**, or **MIGRATION GAP**'));
