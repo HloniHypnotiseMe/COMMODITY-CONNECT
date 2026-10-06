@@ -1,9 +1,33 @@
 import assert from 'node:assert/strict';
-function route(f) { const approval = f.department === 'Risk & Compliance' ? 'Risk & Compliance' : f.department === 'Finance' ? 'Finance' : f.department === 'Payments' ? 'Payments' : f.department === 'Verification' ? 'Verification' : undefined; const needs = ['Risk & Compliance','Finance','Payments','Verification'].includes(f.department) || f.severity === 'critical'; return {to:f.department==='CEO'?'Trade Operations':f.department,status:needs?'approval_required':'ready',requiredApproval:needs?approval:undefined}; }
-const criticalPayment=route({id:'x',severity:'critical',department:'Payments',nextAction:'Reconcile provider status'});
-assert.equal(criticalPayment.status,'approval_required'); assert.equal(criticalPayment.requiredApproval,'Payments');
-const trade=route({id:'y',severity:'high',department:'Trade Operations',nextAction:'Obtain evidence'});
-assert.equal(trade.status,'ready');
-const risk=route({id:'z',severity:'high',department:'Risk & Compliance',nextAction:'Review KYC'});
-assert.equal(risk.status,'approval_required');
+
+const { routeFireFinding } = await import('../src/agent-company.ts');
+
+const criticalPayment = routeFireFinding({
+  id:'x', severity:'critical', department:'Payments', title:'Payment unconfirmed',
+  reason:'Provider evidence is unresolved.', nextAction:'Reconcile provider status.', evidence:[]
+});
+assert.equal(criticalPayment.status, 'approval_required');
+assert.equal(criticalPayment.requiredApproval, 'Payments');
+
+const trade = routeFireFinding({
+  id:'y', severity:'high', department:'Trade Operations', title:'Evidence follow-up',
+  reason:'Delivery evidence is missing.', nextAction:'Obtain evidence.', evidence:[]
+});
+assert.equal(trade.status, 'ready');
+assert.equal(trade.requiredApproval, undefined);
+
+const criticalTrade = routeFireFinding({
+  id:'critical-trade', severity:'critical', department:'Trade Operations', title:'Critical trade finding',
+  reason:'A critical trade operation requires escalation.', nextAction:'Escalate.', evidence:[]
+});
+assert.equal(criticalTrade.status, 'approval_required');
+assert.equal(criticalTrade.requiredApproval, 'CEO');
+
+const risk = routeFireFinding({
+  id:'z', severity:'high', department:'Risk & Compliance', title:'KYC review',
+  reason:'KYC is unresolved.', nextAction:'Review KYC.', evidence:[]
+});
+assert.equal(risk.status, 'approval_required');
+assert.equal(risk.requiredApproval, 'Risk & Compliance');
+
 console.log('Agent Company routing tests: 4 passed');
