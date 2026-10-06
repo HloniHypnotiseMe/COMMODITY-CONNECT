@@ -81,3 +81,72 @@ export function buildCommandCentre(s: CommandCentreSnapshot): CommandCentreModel
     lifecycle,
   };
 }
+
+
+export interface RoleDashboard {
+  role: string;
+  mission: string;
+  priorities: Array<{ priority: CommandPriority; action: string; reason: string }>;
+  permissions: string[];
+}
+
+export function buildRoleDashboard(role: string, s: CommandCentreSnapshot): RoleDashboard {
+  const paymentConfirmed = ['paid','confirmed'].includes(s.paymentStatus.toLowerCase());
+  const missing = sequence.filter(x => !s.documents.includes(x));
+  const priorities: RoleDashboard['priorities'] = [];
+
+  const add = (priority: CommandPriority, action: string, reason: string) =>
+    priorities.push({ priority, action, reason });
+
+  switch (role) {
+    case 'buyer':
+      if (!s.kycVerified) add('high','Complete buyer KYC','Identity verification is required before protected deal progression.');
+      if (missing.length) add('high','Review required trade documents',`Outstanding: ${missing.join(', ')}.`);
+      if (!paymentConfirmed) add('medium','Review provider payment status','RemotePay/provider evidence remains the payment truth boundary.');
+      break;
+    case 'seller':
+      if (!s.kycVerified) add('high','Complete seller KYC','Seller identity is not yet recorded as verified.');
+      if (!s.documents.includes('POP')) add('high','Provide POP evidence','Proof-of-product evidence is still outstanding.');
+      if (!s.documents.includes('BL')) add('medium','Prepare delivery evidence','Bill of Lading evidence is required for delivery/close gates.');
+      break;
+    case 'buyer_mandate':
+      if (!s.documents.includes('BCL')) add('high','Review BCL','Buyer mandate requires the buyer-side commitment evidence.');
+      if (!s.documents.includes('NCNDA')) add('medium','Review NCNDA','Commission-chain protection requires signed NCNDA evidence.');
+      break;
+    case 'seller_mandate':
+      if (!s.documents.includes('FCO')) add('high','Review FCO','Seller mandate needs the commercial offer evidence.');
+      if (!s.documents.includes('SCO')) add('high','Review SCO','Seller-side sequence is incomplete until SCO evidence is present.');
+      if (!s.documents.includes('IMFPA')) add('medium','Review IMFPA','Commission-chain protection requires signed IMFPA evidence.');
+      break;
+    case 'facilitator':
+      if (!s.locked && s.documents.includes('NCNDA') && s.documents.includes('IMFPA')) add('high','Review commission chain','Signed NCNDA and IMFPA are present; the application lock can now be authorized.');
+      if (!s.locked) add('medium','Protect commission chain','Commission terms remain mutable until the authorized lock is recorded.');
+      if (!paymentConfirmed) add('medium','Reconcile payment evidence','Do not treat local payment UI state as settlement evidence.');
+      break;
+    case 'intermediary':
+      if (missing.length) add('high','Coordinate document completion',`Track the protected sequence; outstanding: ${missing.join(', ')}.`);
+      if (!paymentConfirmed) add('medium','Coordinate payment reconciliation','Provider status must be refreshed before payment-dependent progression.');
+      if (s.status === 'escrow_secured' && !s.documents.includes('BL')) add('high','Coordinate delivery evidence','Close remains blocked until delivery evidence is present.');
+      break;
+    default:
+      add('info','Select a trading role','Choose one of the six trading roles to load its operating lens.');
+  }
+
+  if (!priorities.length) add('info','Role queue clear','No additional role-specific action is generated from the supplied evidence.');
+
+  const missions: Record<string,string> = {
+    buyer:'Protect the buyer-side mandate, evidence and payment readiness.',
+    seller:'Protect seller-side product, offer and delivery evidence.',
+    buyer_mandate:'Protect buyer mandate commitments and commission-chain evidence.',
+    seller_mandate:'Protect seller mandate commitments, offer sequence and commission evidence.',
+    facilitator:'Protect deal coordination and the locked commission chain.',
+    intermediary:'Coordinate evidence, counterparties and progression without inventing settlement facts.',
+  };
+
+  return {
+    role,
+    mission: missions[role] ?? 'Role-specific operating view over verified application state.',
+    priorities: priorities.slice(0,6),
+    permissions: ['View deal state','View role-relevant evidence status','Coordinate next actions','No authority to manufacture payment, custody, verification or legal outcomes'],
+  };
+}
