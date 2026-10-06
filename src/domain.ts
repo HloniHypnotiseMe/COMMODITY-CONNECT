@@ -1,20 +1,11 @@
 import type { CommissionParticipant, Commodity, DealStatus } from './types';
 
 export const DEAL_STATUSES: DealStatus[] = ['open', 'escrow_secured', 'closed'];
-
-/**
- * Product workflow contract. This is an application sequencing rule, not a
- * statement that any document has a particular legal effect in every market.
- */
 export const DOCUMENT_SEQUENCE = ['LOI', 'BCL', 'FCO', 'SCO', 'POP', 'SGS', 'BL', 'NCNDA', 'IMFPA'] as const;
 export type DocumentType = typeof DOCUMENT_SEQUENCE[number];
-
 export type TradeUnit = 'MT' | 'KG' | 'Oz' | 'L' | 'Carat';
 
-export interface CommoditySpec {
-  allowedUnits: readonly TradeUnit[];
-  gradeRequired: boolean;
-}
+export interface CommoditySpec { allowedUnits: readonly TradeUnit[]; gradeRequired: boolean; }
 
 const MT: readonly TradeUnit[] = ['MT'];
 const MT_KG: readonly TradeUnit[] = ['MT', 'KG'];
@@ -23,28 +14,17 @@ const LIQUID: readonly TradeUnit[] = ['L'];
 const CARAT_KG: readonly TradeUnit[] = ['Carat', 'KG'];
 
 export const COMMODITY_SPECS: Record<Commodity, CommoditySpec> = {
-  'Coal RB1': { allowedUnits: MT, gradeRequired: true },
-  'Coal RB2': { allowedUnits: MT, gradeRequired: true },
-  'Chrome 42%': { allowedUnits: MT, gradeRequired: true },
-  'Manganese': { allowedUnits: MT, gradeRequired: true },
-  'Gold 99.99%': { allowedUnits: OZ_KG, gradeRequired: true },
-  'Platinum': { allowedUnits: OZ_KG, gradeRequired: true },
-  'Palladium': { allowedUnits: OZ_KG, gradeRequired: true },
-  'Rhodium': { allowedUnits: OZ_KG, gradeRequired: true },
-  'Iron Ore': { allowedUnits: MT, gradeRequired: true },
-  'Copper': { allowedUnits: MT_KG, gradeRequired: true },
-  'Cobalt': { allowedUnits: MT_KG, gradeRequired: true },
-  'Lithium': { allowedUnits: MT_KG, gradeRequired: true },
-  'Diamond': { allowedUnits: CARAT_KG, gradeRequired: true },
-  'Uranium': { allowedUnits: MT_KG, gradeRequired: true },
-  'Vanadium': { allowedUnits: MT_KG, gradeRequired: true },
-  'Titanium': { allowedUnits: MT_KG, gradeRequired: true },
-  'Diesel 50ppm': { allowedUnits: LIQUID, gradeRequired: true },
-  'Diesel 500ppm': { allowedUnits: LIQUID, gradeRequired: true },
-  'Petrol': { allowedUnits: LIQUID, gradeRequired: true },
-  'Sugar ICUMSA 45': { allowedUnits: MT, gradeRequired: true },
-  'Maize': { allowedUnits: MT, gradeRequired: true },
-  'Nickel': { allowedUnits: MT_KG, gradeRequired: true },
+  'Coal RB1': { allowedUnits: MT, gradeRequired: true }, 'Coal RB2': { allowedUnits: MT, gradeRequired: true },
+  'Chrome 42%': { allowedUnits: MT, gradeRequired: true }, 'Manganese': { allowedUnits: MT, gradeRequired: true },
+  'Gold 99.99%': { allowedUnits: OZ_KG, gradeRequired: true }, 'Platinum': { allowedUnits: OZ_KG, gradeRequired: true },
+  'Palladium': { allowedUnits: OZ_KG, gradeRequired: true }, 'Rhodium': { allowedUnits: OZ_KG, gradeRequired: true },
+  'Iron Ore': { allowedUnits: MT, gradeRequired: true }, 'Copper': { allowedUnits: MT_KG, gradeRequired: true },
+  'Cobalt': { allowedUnits: MT_KG, gradeRequired: true }, 'Lithium': { allowedUnits: MT_KG, gradeRequired: true },
+  'Diamond': { allowedUnits: CARAT_KG, gradeRequired: true }, 'Uranium': { allowedUnits: MT_KG, gradeRequired: true },
+  'Vanadium': { allowedUnits: MT_KG, gradeRequired: true }, 'Titanium': { allowedUnits: MT_KG, gradeRequired: true },
+  'Diesel 50ppm': { allowedUnits: LIQUID, gradeRequired: true }, 'Diesel 500ppm': { allowedUnits: LIQUID, gradeRequired: true },
+  'Petrol': { allowedUnits: LIQUID, gradeRequired: true }, 'Sugar ICUMSA 45': { allowedUnits: MT, gradeRequired: true },
+  'Maize': { allowedUnits: MT, gradeRequired: true }, 'Nickel': { allowedUnits: MT_KG, gradeRequired: true },
 };
 
 export function getCommoditySpec(commodity: Commodity): CommoditySpec {
