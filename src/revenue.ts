@@ -8,12 +8,68 @@ export const COMMISSION_PROTECTION = { pct: 0.25, flatZar: 5000 } as const;
 export const SUBSCRIPTION_PRICES_ZAR: Record<SubscriptionPlan, number> = { free: 0, mandate_pro: 1500, facilitator_pro: 2500, enterprise: 10000 };
 export const VERIFICATION_PRICES_ZAR: Record<VerificationItem, number> = { BCL: 2500, SGS: 3500, POP: 1500, KYC: 7500 };
 export const LISTING_PRICES_ZAR: Record<ListingTerm, number> = { '7d': 2000, '30d': 5000 };
-export function percentageFee(base:number,pct:number){return Number.isFinite(base)&&base>=0&&Number.isFinite(pct)&&pct>=0?Math.round(base*(pct/100)*100)/100:0}
-export function quoteTransaction(base:number,pct=0.75,currency='USD'):RevenueQuote{if(pct<0.75||pct>1.5)throw new Error('Transaction fee must be between 0.75% and 1.5%.');return{stream:'transaction',code:'TRANSACTION_SERVICE',description:'Escrow/transaction service fee',currency,amount:percentageFee(base,pct),basis:pct+'% of deal value at the configured transaction-service rate',payable:true}}
-export function quoteCommissionProtection(base:number,mode:'percentage'|'flat'='percentage'):RevenueQuote{const amount=mode==='percentage'?percentageFee(base,0.25):5000;return{stream:'commission_protection',code:'COMMISSION_PROTECTION',description:'Commission-chain protection fee',currency:'ZAR',amount,basis:mode==='percentage'?'0.25% of protected commission basis':'Flat R5,000 protection fee',payable:true}}
-export function quoteSubscription(plan:SubscriptionPlan):RevenueQuote{return{stream:'subscription',code:'SUB_'+plan.toUpperCase(),description:plan.replace('_',' ')+' subscription',currency:'ZAR',amount:SUBSCRIPTION_PRICES_ZAR[plan],basis:'Monthly subscription',payable:plan!=='free'}}
-export function quoteVerification(item:VerificationItem):RevenueQuote{return{stream:'document_verification',code:'VERIFY_'+item,description:item+' verification',currency:'ZAR',amount:VERIFICATION_PRICES_ZAR[item],basis:'Per verification request',payable:true}}
+
+function requireFiniteNonNegative(value: number, field: string): void {
+  if (!Number.isFinite(value) || value < 0) throw new Error(`${field} must be a finite non-negative number.`);
+}
+function requireFinitePositive(value: number, field: string): void {
+  if (!Number.isFinite(value) || value <= 0) throw new Error(`${field} must be a finite number greater than zero.`);
+}
+function requireKnown<T extends string>(value: string, allowed: readonly T[], field: string): asserts value is T {
+  if (!allowed.includes(value as T)) throw new Error(`${field} is not supported: ${value}.`);
+}
+
+export function percentageFee(base:number,pct:number){
+  requireFiniteNonNegative(base,'Fee basis');
+  requireFiniteNonNegative(pct,'Fee percentage');
+  return Math.round(base*(pct/100)*100)/100;
+}
+
+export function quoteTransaction(base:number,pct=0.75,currency='USD'):RevenueQuote{
+  requireFinitePositive(base,'Deal value');
+  if(pct<TRANSACTION_FEE_RANGE.minPct||pct>TRANSACTION_FEE_RANGE.maxPct) throw new Error('Transaction fee must be between 0.75% and 1.5%.');
+  if(!currency.trim()) throw new Error('Transaction currency is required.');
+  return{stream:'transaction',code:'TRANSACTION_SERVICE',description:'Escrow/transaction service fee',currency,amount:percentageFee(base,pct),basis:pct+'% of deal value at the configured transaction-service rate',payable:true};
+}
+
+export function quoteCommissionProtection(base:number,mode:'percentage'|'flat'='percentage'):RevenueQuote{
+  requireFinitePositive(base,'Protected commission basis');
+  if(mode!=='percentage'&&mode!=='flat') throw new Error('Commission protection mode is invalid.');
+  const amount=mode==='percentage'?percentageFee(base,COMMISSION_PROTECTION.pct):COMMISSION_PROTECTION.flatZar;
+  return{stream:'commission_protection',code:'COMMISSION_PROTECTION',description:'Commission-chain protection fee',currency:'ZAR',amount,basis:mode==='percentage'?'0.25% of protected commission basis':'Flat R5,000 protection fee',payable:true};
+}
+
+export function quoteSubscription(plan:SubscriptionPlan):RevenueQuote{
+  requireKnown(plan,Object.keys(SUBSCRIPTION_PRICES_ZAR) as SubscriptionPlan[],'Subscription plan');
+  return{stream:'subscription',code:'SUB_'+plan.toUpperCase(),description:plan.replace('_',' ')+' subscription',currency:'ZAR',amount:SUBSCRIPTION_PRICES_ZAR[plan],basis:'Monthly subscription',payable:plan!=='free'};
+}
+
+export function quoteVerification(item:VerificationItem):RevenueQuote{
+  requireKnown(item,Object.keys(VERIFICATION_PRICES_ZAR) as VerificationItem[],'Verification item');
+  return{stream:'document_verification',code:'VERIFY_'+item,description:item+' verification',currency:'ZAR',amount:VERIFICATION_PRICES_ZAR[item],basis:'Per verification request',payable:true};
+}
+
 export function quoteDocumentPack():RevenueQuote{return{stream:'document_generation',code:'NCNDA_IMFPA_PACK',description:'NCNDA/IMFPA generation pack',currency:'ZAR',amount:1500,basis:'Per populated deal/commission-chain pack',payable:true}}
-export function quotePremiumListing(term:ListingTerm):RevenueQuote{return{stream:'premium_listing',code:'LISTING_'+term.toUpperCase(),description:'Premium commodity listing',currency:'ZAR',amount:LISTING_PRICES_ZAR[term],basis:term==='7d'?'7-day listing':'30-day listing',payable:true}}
-export function quoteIntelligence(base:number,currency='ZAR'):RevenueQuote{return{stream:'intelligence',code:'INTELLIGENCE_FINDER',description:'Data/intelligence lead-generation finder fee',currency,amount:percentageFee(base,1),basis:'1% finder fee on the applicable lead/deal basis',payable:true}}
-export function quoteAllApprovedStreams(input:{dealValue:number;protectedCommissionBasis?:number;transactionPct?:number;transactionCurrency?:string;subscription?:SubscriptionPlan;verification?:VerificationItem;listing?:ListingTerm;intelligenceBasis?:number}):RevenueQuote[]{const q:RevenueQuote[]=[];if(input.dealValue>0)q.push(quoteTransaction(input.dealValue,input.transactionPct,input.transactionCurrency));if(input.protectedCommissionBasis!==undefined)q.push(quoteCommissionProtection(input.protectedCommissionBasis));if(input.subscription)q.push(quoteSubscription(input.subscription));if(input.verification)q.push(quoteVerification(input.verification));q.push(quoteDocumentPack());if(input.listing)q.push(quotePremiumListing(input.listing));if(input.intelligenceBasis!==undefined)q.push(quoteIntelligence(input.intelligenceBasis));return q}
+
+export function quotePremiumListing(term:ListingTerm):RevenueQuote{
+  requireKnown(term,Object.keys(LISTING_PRICES_ZAR) as ListingTerm[],'Listing term');
+  return{stream:'premium_listing',code:'LISTING_'+term.toUpperCase(),description:'Premium commodity listing',currency:'ZAR',amount:LISTING_PRICES_ZAR[term],basis:term==='7d'?'7-day listing':'30-day listing',payable:true};
+}
+
+export function quoteIntelligence(base:number,currency='ZAR'):RevenueQuote{
+  requireFinitePositive(base,'Intelligence basis');
+  if(!currency.trim()) throw new Error('Intelligence currency is required.');
+  return{stream:'intelligence',code:'INTELLIGENCE_FINDER',description:'Data/intelligence lead-generation finder fee',currency,amount:percentageFee(base,1),basis:'1% finder fee on the applicable lead/deal basis',payable:true};
+}
+
+export function quoteAllApprovedStreams(input:{dealValue:number;protectedCommissionBasis?:number;transactionPct?:number;transactionCurrency?:string;subscription?:SubscriptionPlan;verification?:VerificationItem;listing?:ListingTerm;intelligenceBasis?:number}):RevenueQuote[]{
+  const q:RevenueQuote[]=[];
+  if(input.dealValue>0)q.push(quoteTransaction(input.dealValue,input.transactionPct,input.transactionCurrency));
+  if(input.protectedCommissionBasis!==undefined)q.push(quoteCommissionProtection(input.protectedCommissionBasis));
+  if(input.subscription)q.push(quoteSubscription(input.subscription));
+  if(input.verification)q.push(quoteVerification(input.verification));
+  q.push(quoteDocumentPack());
+  if(input.listing)q.push(quotePremiumListing(input.listing));
+  if(input.intelligenceBasis!==undefined)q.push(quoteIntelligence(input.intelligenceBasis));
+  return q;
+}
