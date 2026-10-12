@@ -2,7 +2,7 @@
 
 ## Implemented in the current build
 
-- React/Vite application shell and GitHub Pages workflow.
+- React/Vite application shell and CI/build verification. The GitHub Pages deployment workflow is retired; production deployment targets the C6 self-hosted stack.
 - 21-commodity catalogue and deal-value calculator.
 - Deterministic commission calculation rounded to cents.
 - PocketBase collections/migrations for KYC, deals, participants, documents, wallets, escrows and audit events.
@@ -53,3 +53,7 @@ USDT/BTC payout destinations can be modelled, but crypto settlement remains disa
 - Escrow status transitions are operator-reconciled and require payment/release evidence; the client cannot manufacture `confirmed` or `released` financial states.
 - Deal/document/escrow actions produce audit events where the runtime can establish an authenticated actor.
 - Commodity Connect creates a local escrow record only as a reference to the RemotePay payment; it does not represent custody of funds.
+
+### 8. Deployment target (2026-10-12)
+
+The GitHub Pages workflow failed because Pages was not enabled and is not the approved final deployment target. The workflow is being retired. Production deployment remains pending the Contabo VPS and the C6 deployment path: C6-Os -> c6-deploy -> Docker/Compose -> Caddy/Cloudflare. Do not claim LIVE until the deployed domain, authenticated identity, deal lifecycle, and RemotePay/provider verification gates pass.
