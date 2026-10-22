@@ -1,59 +1,106 @@
 # Commodity Connect — Production Gates
 
-## Implemented in the current build
+## Current production architecture
 
-- React/Vite application shell and CI/build verification. The GitHub Pages deployment workflow is retired; production deployment targets the C6 self-hosted stack.
-- 21-commodity catalogue and deal-value calculator.
-- Deterministic commission calculation rounded to cents.
-- PocketBase collections/migrations for KYC, deals, participants, documents, wallets, escrows and audit events.
-- Authenticated user onboarding into a pending KYC profile.
-- Document upload with enforced document sequence in the client and server-side collection ownership rules.
-- Server-side invariant requiring verified NCNDA and IMFPA evidence before commission-chain lock.
-- Commission participant snapshot structure and lock state.
+Commodity Connect is being moved onto the C6-owned self-hosted platform. The target production path is:
+
+```
+Commodity Connect browser
+  -> authenticated C6 SaaS Core
+  -> server-side C6 RemotePay adapter
+  -> RemotePay / payment provider
+  -> verified provider and transaction evidence
+  -> C6 PostgreSQL + evidence storage
+  -> audit events and downstream workflows
+```
+
+The browser must not call RemotePay directly or receive RemotePay merchant/provider credentials. C6 control-plane secrets and provider credentials remain server-side.
+
+**Runtime status:** the C6 SaaS Core/PostgreSQL architecture is the target, but code presence and a passing frontend build do not prove the cross-service path is deployed or live. PocketBase-era migrations, hooks, and data paths are legacy migration/dev compatibility; they are not the final production runtime.
+
+## Implemented in source (not automatically production-verified)
+
+- React/Vite/TypeScript application shell, commodity catalogue and deal-value calculator.
+- Commodity-specific units/grade validation and deterministic commission calculations.
+- Deal, participant, document-sequence, KYC, commission-lock, and audit-event concepts.
+- Document upload sequence and source-level authorization/invariant checks in the legacy PocketBase implementation.
 - RemotePay payment-link client boundary with idempotency key and provider-status refresh.
-- UI explicitly distinguishes payment-link creation from actual payment confirmation.
+- UI distinction between payment-link creation and actual payment confirmation.
 - Demo lifecycle advancement disabled unless `VITE_DEMO_MODE=true`.
-- Server-side escrow reconciliation state machine and lifecycle evidence gates.
-- Audit events for deal creation, document activity, commission locking, lifecycle advancement and escrow reconciliation.
+- Source-level lifecycle and escrow reconciliation rules that require evidence before protected transitions.
+- C6 SaaS Core product-client contract.
 
-## External gates
+These bullets mean the implementation exists in source. Each consequential path still needs tests and runtime evidence before it can be labelled WORKS, VERIFIED, or LIVE.
 
-### 1. GitHub repository
+## Production acceptance gates
 
-The repository `HloniHypnotiseMe/COMMODITY-CONNECT` now exists and the foundation is being published to it. GitHub Actions is the authoritative CI/build verification once the uploaded files are on `main`.
+### 1. Shared C6 runtime
 
-### 2. PocketBase runtime
+- [ ] Provision and secure the approved self-hosted C6 deployment target.
+- [ ] Deploy C6 SaaS Core, private PostgreSQL, and approved evidence storage through the C6 deployment stack.
+- [ ] Configure DNS/TLS and runtime-only secrets without exposing them in browser bundles.
+- [ ] Apply reviewed migrations explicitly and verify health/readiness.
+- [ ] Prove database and evidence-store write/read round trips, backup, and restore.
 
-A deployed PocketBase instance and `VITE_POCKETBASE_URL` are required for real authentication, persistence, uploads and server-side hooks. The migrations still require execution against the actual PocketBase version selected for deployment.
+### 2. Identity, tenant isolation, and authorization
 
-### 3. RemotePay production integration
+- [ ] Verify sign-in, tenant/product scoping, participant roles, and server-side authorization against the deployed C6 Core.
+- [ ] Prove one tenant/user cannot read or mutate another tenant's deals, KYC records, documents, commission data, or evidence.
+- [ ] Ensure document download and mutation operations are authorized on the server, not merely hidden by UI state.
+- [ ] Verify the browser receives only the product-scoped capability/configuration it needs; control-plane and provider credentials stay server-side.
 
-Commodity Connect uses the existing RemotePay payment-link boundary. RemotePay's current canonical implementation creates a SimplyBLU hosted checkout, persists it to its transaction ledger and enforces idempotency. Production payment verification still requires a real provider/account test and webhook reconciliation.
+### 3. RemotePay integration and payment truth
 
-### 4. RemotePay API protection
+- [ ] Route payment-link creation through the authenticated C6 Core/server-side RemotePay boundary; never expose a general RemotePay secret to the browser.
+- [ ] Confirm caller authorization on the deployed boundary. The current repository's source-level client contract alone is not proof of authorized production access.
+- [ ] Verify a real provider test payment and its authenticated callback/reconciliation against RemotePay's canonical ledger.
+- [ ] Prove duplicate/replayed callbacks are idempotent and invalid callbacks cannot mutate payment or deal state.
+- [ ] Keep payment-link creation distinct from payment confirmation. No UI or local record may manufacture a paid/confirmed state.
 
-The currently inspected RemotePay `POST /api/v1/payment-links` endpoint does not show a user authentication requirement. Commodity Connect therefore treats live payment integration as an external security/configuration gate until the shared RemotePay boundary has appropriate caller authorization or an equivalent protected server-side integration path.
+### 4. Deal documents and commission-chain lock
 
-### 5. Verification authority
+- [ ] Require an authorized operator to verify NCNDA/IMFPA and other required deal documents before chain lock.
+- [ ] Prove that upload alone cannot satisfy verification.
+- [ ] Verify participant snapshots and locked terms cannot be changed after the lock without an authorized, audited workflow.
+- [ ] Treat document and commission controls as application controls; do not claim automatic legal enforceability.
 
-NCNDA/IMFPA and other deal documents must be verified by an authorized operator before chain lock. Upload alone cannot satisfy this gate.
+### 5. Deal lifecycle, escrow, delivery, and release
 
-### 6. Financial release
+- [ ] Run a complete test deal through creation, participant onboarding, required documents, authorized lock, payment-link creation, provider confirmation, dispatch/delivery evidence, dispute handling, and final release/close.
+- [ ] Verify every protected transition server-side and record the authenticated actor plus evidence references in the audit trail.
+- [ ] Require verified provider/payment evidence before marking escrow secured.
+- [ ] Require released escrow plus verified bill-of-lading (BL) evidence before closing a deal.
+- [ ] Treat a local escrow record only as a reference to the RemotePay transaction; it does not represent custody of funds.
+- [ ] Confirm no payout/release is triggered from UI state alone.
 
-No financial release is claimed until RemotePay/provider evidence and the required delivery/document evidence are available. Commodity Connect does not create a fake local custody state.
+### 6. Crypto and other unsupported settlement rails
 
-### 7. Crypto settlement
+- [ ] Keep BTC/USDT and any other unverified settlement rail disabled until an actual provider/settlement integration, controls, reconciliation, and test evidence exist.
 
-USDT/BTC payout destinations can be modelled, but crypto settlement remains disabled until a real supported settlement rail is connected and verified.
+### 7. CI, build, and deployed verification
 
-## Lifecycle hardening completed
+- [ ] Confirm the current GitHub Actions workflow actually executes; a runner failure before steps start is not an application test result.
+- [ ] Run unit tests, type check, and production build.
+- [ ] Verify the deployed domain over HTTPS and test authenticated identity, evidence upload/read, deal lifecycle, and RemotePay integration against the deployed runtime.
+- [ ] Record the commit, environment, test results, timestamps, and evidence references in the C6 completion register.
 
-- The hardened migration keeps deal lifecycle updates available through the API while moving sensitive field immutability into the server hook after commission lock.
-- `pb_hooks/commodity.pb.js` rejects invalid lifecycle transitions, requires confirmed escrow/provider state before `open → escrow_secured`, and requires released escrow plus verified BL evidence before `escrow_secured → closed`.
-- Escrow status transitions are operator-reconciled and require payment/release evidence; the client cannot manufacture `confirmed` or `released` financial states.
-- Deal/document/escrow actions produce audit events where the runtime can establish an authenticated actor.
-- Commodity Connect creates a local escrow record only as a reference to the RemotePay payment; it does not represent custody of funds.
+## Legacy PocketBase material
 
-### 8. Deployment target (2026-10-12)
+PocketBase migrations/hooks and their tests remain useful as legacy implementation and migration evidence. They do **not** establish that PocketBase must be provisioned as the final production runtime. Before removing legacy code or data, document any required data migration, verify the C6 Core replacement, and preserve the source data and recovery path.
 
-The GitHub Pages workflow failed because Pages was not enabled and is not the approved final deployment target. The workflow is being retired. Production deployment remains pending the Contabo VPS and the C6 deployment path: C6-Os -> c6-deploy -> Docker/Compose -> Caddy/Cloudflare. Do not claim LIVE until the deployed domain, authenticated identity, deal lifecycle, and RemotePay/provider verification gates pass.
+## Deployment target
+
+Production deployment is owned by the C6 deployment stack:
+
+`C6-Os -> c6-deploy -> Contabo Node 01 -> Docker/Compose -> Caddy/Cloudflare`.
+
+Provisioning and production verification remain separate gates. Do not mark Commodity Connect LIVE until the deployed domain, authenticated identity, evidence store, deal lifecycle, and RemotePay/provider verification gates pass.
+
+## Claim standard
+
+- **EXISTS:** implementation is present in source.
+- **WORKS:** the implementation executes successfully in a reproducible test.
+- **VERIFIED:** test/runtime evidence has been captured and reviewed.
+- **LIVE:** the production deployment has passed external HTTPS and end-to-end acceptance checks.
+
+Never promote a status based only on UI presence, a local build, a mocked test, a payment link, or a workflow that failed before its steps executed.
