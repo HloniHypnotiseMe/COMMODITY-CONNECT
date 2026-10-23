@@ -4,31 +4,30 @@ C6 Group / REMOTEPAY FINTECH SERVICES — protected commodity deal-chain infrast
 
 ## Product boundary
 
-Commodity Connect is being re-homed onto the C6-owned self-hosted platform. C6 SaaS Core is the target persistence/control plane, backed by PostgreSQL.
+Commodity Connect is being re-homed onto the C6-owned self-hosted platform. C6 SaaS Core is the product API and control boundary. The intended shared persistence layer is self-hosted Supabase/PostgreSQL, owned and operated by C6; individual product browsers must not connect directly to Supabase or hold database/service-role credentials.
 
 The production payment path is:
 
 ```
 Commodity Connect browser
-  -> C6 SaaS Core
+  -> C6 SaaS Core product API
   -> C6 RemotePay adapter
   -> RemotePay/provider
   -> provider evidence
-  -> C6 PostgreSQL
+  -> shared C6 Supabase/PostgreSQL persistence
   -> downstream events/audit
 ```
 
-The browser must never call RemotePay directly or receive RemotePay merchant/provider secrets.
-
-PocketBase-era application data paths remain only as migration/dev compatibility and are not the final production runtime.
+The browser must never call RemotePay directly or receive RemotePay merchant/provider secrets. C6 SaaS Core remains the controlled API boundary for authentication, tenant scoping, authorization, validation, audit and product operations.
 
 ## Current architecture status
 
 - Payment truth: RemotePay/provider evidence, reached through the C6 platform boundary.
-- Platform target: C6 SaaS Core / shared C6 PostgreSQL.
-- Legacy runtime: PocketBase-era paths remain only for migration/dev compatibility.
+- Product API boundary: C6 SaaS Core.
+- Persistence target: C6-operated Supabase/PostgreSQL behind the C6 SaaS Core server-side adapter. The target architecture is documented; do not treat it as deployed or verified without runtime evidence.
+- PocketBase: retired as an application runtime. Historical references may remain in migration records; no new dependency, service, browser client, or production configuration should be added.
 - Claim gate: UI/code presence is not proof of a live trade, payment, escrow, payout, registration, or external-provider outcome.
-- The C6 payment-link route contract is defined in `src/platform-client.ts`; the corresponding C6 SaaS Core runtime endpoint is now implemented on the C6 core Wave 8 branch, but the cross-service runtime path still requires deployment/exercise before this integration can be called WORKS/VERIFIED/LIVE.
+- The C6 payment-link route contract is defined in `src/platform-client.ts`; the corresponding C6 SaaS Core runtime endpoint is reported on the C6 core Wave 8 branch, but the cross-service runtime path still requires deployment/exercise before this integration can be called WORKS/VERIFIED/LIVE.
 
 ## Foundation
 
@@ -54,7 +53,7 @@ PocketBase-era application data paths remain only as migration/dev compatibility
 - Crypto settlement is disabled until a real supported rail is verified.
 - C6 control-plane credentials never enter browser bundles.
 - No product may create a second direct RemotePay integration when the shared C6 adapter is the authoritative payment boundary.
-
+- Product frontends call C6 SaaS Core; they do not connect directly to Supabase/PostgreSQL.
 
 ## C6-native deployment
 
@@ -62,6 +61,6 @@ Production deployment is owned by the C6 deployment stack: C6-Os -> c6-deploy ->
 
 The frontend is built with a root URL base so it can be served directly from its assigned C6 domain by the Caddy hosting edge.
 
-Deployment-time browser configuration uses VITE_C6_SAAS_CORE_URL and VITE_C6_PRODUCT_KEY. These are bounded browser configuration values; C6 control-plane and payment-provider secrets remain server-side.
+Deployment-time browser configuration uses `VITE_C6_SAAS_CORE_URL` and `VITE_C6_PRODUCT_KEY`. These are bounded browser configuration values; C6 control-plane, database and payment-provider secrets remain server-side.
 
 A successful frontend build is not a LIVE claim. LIVE requires external HTTPS verification and the authenticated identity, evidence, deal lifecycle and payment/provider verification gates defined by C6 SaaS Core.
