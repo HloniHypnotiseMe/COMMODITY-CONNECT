@@ -4,7 +4,7 @@ import type { RevenueQuote } from './revenue';
 
 /** Wave 6 C6 Platform boundary. Browser code never receives database or control-plane credentials. */
 export const C6_PLATFORM_PRODUCT_ID = 'commodity-connect';
-export type PlatformPersistence = 'c6-postgresql' | 'legacy-pocketbase';
+export type PlatformPersistence = 'c6-postgresql';
 export type PlatformReadiness = 'configured' | 'not_configured';
 export interface C6PlatformConfig { baseUrl: string; productId: typeof C6_PLATFORM_PRODUCT_ID; }
 export interface DealRecord {
